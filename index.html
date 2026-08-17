@@ -11,7 +11,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-    // Configuration Firebase pour le projet Poker
+    // Configuration Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyDOQDzKphZHdNDxRGiAqG9UxKw9CUHM6RI",
       authDomain: "poker-e2c18.firebaseapp.com",
@@ -32,7 +32,7 @@
 <body>
   <div class="poker-container">
     <header class="game-header">
-      <h1>Texas Hold'em</h1>
+      <h1>P'tit Poker Mémor</h1>
       
       <!-- Sélecteur de mode -->
       <div class="mode-select">
@@ -90,6 +90,7 @@
         <div class="cards-container" id="my-cards"></div>
         <div class="player-info">
           <span class="player-name" id="my-name">Joueur 1</span>
+          <span id="my-reloads" class="reload-badge"></span>
           <span id="my-last-action" class="last-action hidden"></span>
           <span class="player-chips"><span id="my-chips">1000</span> €</span>
         </div>
@@ -99,10 +100,19 @@
     <!-- Contrôles -->
     <div class="controls">
       <button id="btn-start" class="btn btn-start">Nouvelle Main</button>
+      <button id="btn-refill" class="btn btn-info hidden">Recaver (+1000€)</button>
+      
       <div id="action-buttons" class="action-buttons hidden">
         <button id="btn-fold" class="btn btn-danger">Se coucher</button>
-        <button id="btn-check" class="btn btn-secondary">Paroler / Suivre</button>
-        <button id="btn-raise" class="btn btn-success">Relancer (+50€)</button>
+        <button id="btn-check" class="btn btn-secondary">Suivre / Check</button>
+        
+        <!-- Zone de relance dynamique -->
+        <div class="raise-box">
+          <input type="number" id="raise-amount" class="raise-input" value="50" min="10" step="10">
+          <button id="btn-raise" class="btn btn-success">Relancer</button>
+        </div>
+        
+        <button id="btn-all-in" class="btn btn-warning">Tapis !</button>
       </div>
     </div>
   </div>
