@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Texas Hold'em</title>
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- SDK Firebase Modulaire (v10) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    // Configuration Firebase pour le projet Poker
+    const firebaseConfig = {
+      apiKey: "AIzaSyDOQDzKphZHdNDxRGiAqG9UxKw9CUHM6RI",
+      authDomain: "poker-e2c18.firebaseapp.com",
+      databaseURL: "https://poker-e2c18-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "poker-e2c18",
+      storageBucket: "poker-e2c18.firebasestorage.app",
+      messagingSenderId: "313041421349",
+      appId: "1:313041421349:web:badf86c9b419d601a6ebcc"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    window.db = db;
+    window.firebaseRefs = { ref, set, onValue, update };
+  </script>
+</head>
+<body>
+  <div class="poker-container">
+    <header class="game-header">
+      <h1>Texas Hold'em</h1>
+      
+      <!-- Sélecteur de mode -->
+      <div class="mode-select">
+        <label for="select-mode">Mode :</label>
+        <select id="select-mode">
+          <option value="bot">Vs Bot AI</option>
+          <option value="hotseat">2 Joueurs (Même PC)</option>
+          <option value="online">Multijoueur En Ligne</option>
+        </select>
+      </div>
+
+      <div class="pot-display">Pot : <span id="pot-amount">0</span> €</div>
+    </header>
+
+    <!-- Menu Multijoueur (Caché par défaut) -->
+    <div id="online-lobby" class="lobby-container hidden">
+      
+      <!-- Champ pour le pseudo -->
+      <div class="name-box" style="text-align: center; margin-bottom: 10px;">
+        <label for="player-name-input" style="font-weight: bold; margin-right: 10px;">Ton pseudo :</label>
+        <input type="text" id="player-name-input" placeholder="Ex: Loïck" style="padding: 6px; border-radius: 6px; border: 1px solid #555; background: #2a2a2a; color: white; text-align: center;">
+      </div>
+
+      <div class="create-room-box">
+        <label for="player-count">Créer une partie :</label>
+        <select id="player-count" style="padding: 6px; border-radius: 6px; background: #2a2a2a; color: white; border: 1px solid #555;">
+          <option value="2">2 Joueurs</option>
+          <option value="3">3 Joueurs</option>
+          <option value="4">4 Joueurs</option>
+          <option value="5">5 Joueurs</option>
+          <option value="6">6 Joueurs</option>
+        </select>
+        <button id="btn-create-room" class="btn btn-secondary">Créer le salon</button>
+      </div>
+      
+      <div class="join-room-box">
+        <label>Rejoindre :</label>
+        <input type="text" id="room-code-input" placeholder="Code (ex: 8542)" style="width: 120px;">
+        <button id="btn-join-room" class="btn btn-secondary">Rejoindre</button>
+      </div>
+
+      <div id="lobby-status" class="game-message hidden" style="margin-top: 15px;"></div>
+    </div>
+
+    <div class="poker-table">
+      <!-- Zone des adversaires (Générée dynamiquement) -->
+      <div id="opponents-zone" class="opponents-container"></div>
+
+      <!-- Zone Commune -->
+      <div class="community-zone">
+        <div class="community-cards" id="community-cards"></div>
+        <div class="game-message" id="game-message">Choisis un mode et clique sur "Nouvelle Main".</div>
+      </div>
+
+      <!-- Zone Mon Joueur (ou Joueur 1 en local) -->
+      <div id="my-zone" class="player-zone p1-zone">
+        <div class="cards-container" id="my-cards"></div>
+        <div class="player-info">
+          <span class="player-name" id="my-name">Joueur 1</span>
+          <span class="player-chips"><span id="my-chips">1000</span> €</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contrôles -->
+    <div class="controls">
+      <button id="btn-start" class="btn btn-start">Nouvelle Main</button>
+      <div id="action-buttons" class="action-buttons hidden">
+        <button id="btn-fold" class="btn btn-danger">Se coucher</button>
+        <button id="btn-check" class="btn btn-secondary">Paroler / Suivre</button>
+        <button id="btn-raise" class="btn btn-success">Relancer (+50€)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Écran d'attente passe-et-joue -->
+  <div id="pass-overlay" class="overlay hidden">
+    <div class="overlay-card">
+      <h2 id="overlay-title">Au tour de...</h2>
+      <p>Passez le PC au joueur concerné. Cliquez sur le bouton quand vous êtes prêt.</p>
+      <button id="btn-ready" class="btn btn-start">Je suis prêt !</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
