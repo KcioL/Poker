@@ -83,7 +83,7 @@ body {
 
 .folded { opacity: 0.5; }
 
-/* -- BADGES ET INFOS -- */
+/* Badges d'informations */
 .last-action {
   background-color: #3498db; color: white; padding: 2px 8px; border-radius: 4px;
   font-size: 0.75rem; font-style: italic; text-transform: uppercase; letter-spacing: 0.5px;
@@ -91,7 +91,6 @@ body {
 .reload-badge {
   color: #aaa; font-size: 0.8rem;
 }
-/* Nouveau Badge du Dealer */
 .dealer-badge {
   background-color: #ffffff; color: #000000; border-radius: 50%;
   width: 22px; height: 22px; display: inline-flex; justify-content: center; align-items: center;
@@ -107,12 +106,14 @@ body {
   border-radius: 8px; color: #e0e0e0; text-align: center; max-width: 80%;
 }
 
-/* -- CARTES ET ANIMATIONS -- */
+/* CARTES ET ANIMATIONS */
 .cards-container, .community-cards {
   display: flex; gap: 5px; min-height: 80px; perspective: 1000px;
 }
 
-.card-wrapper { width: 55px; height: 80px; }
+.card-wrapper {
+  width: 55px; height: 80px;
+}
 .card-wrapper.deal-animation { animation: deal 0.4s ease-out forwards; }
 
 @keyframes deal {
@@ -139,7 +140,7 @@ body {
 .card-back { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border: 2px solid #ffffff; }
 .card-center { align-self: center; font-size: 1.2rem; }
 
-/* -- BOUTONS ET CONTRÔLES -- */
+/* BOUTONS ET CONTRÔLES */
 .controls, .action-buttons { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; align-items: center; }
 .hidden { display: none !important; }
 
@@ -157,17 +158,10 @@ body {
 .btn-warning { background-color: #e67e22; color: #fff; }
 .btn-info { background-color: #9b59b6; color: #fff; }
 
-.raise-box { display: flex; gap: 5px; background: rgba(0,0,0,0.4); padding: 4px; border-radius: 10px; }
+.raise-box {
+  display: flex; gap: 5px; background: rgba(0,0,0,0.4); padding: 4px; border-radius: 10px;
+}
 .raise-input {
   width: 70px; padding: 5px; border-radius: 6px; border: none; 
   text-align: center; font-weight: bold; background: #fff; color: #000;
-}
-
-.overlay {
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9);
-  display: flex; justify-content: center; align-items: center; z-index: 100;
-}
-.overlay-card {
-  background: #1e1e1e; padding: 30px; border-radius: 16px; border: 2px solid #ffd700;
-  text-align: center; display: flex; flex-direction: column; gap: 20px; max-width: 400px;
 }
