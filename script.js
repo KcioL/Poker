@@ -468,7 +468,7 @@ function nextTurn() {
         gameState.players.forEach(p => {
             if (p.state === 'ACTIVE') {
                 const handResult = getBestHand(p.cards, gameState.communityCards);
-                p.lastAction = handResult.name; // Affiche "Double Paire", etc.
+                p.lastAction = handResult.name; 
                 
                 if (handResult.score > bestScore) {
                     bestScore = handResult.score;
@@ -477,11 +477,11 @@ function nextTurn() {
             }
         });
 
-        syncState(); // Affiche les combinaisons à l'écran
+        syncState(); 
         
         setTimeout(() => {
             endRoundWinner(winner);
-        }, 4000); // 4 secondes pour que tout le monde voie les cartes
+        }, 4000); 
     } else {
         gameState.stage = 'PAUSE';
         syncState(); 
@@ -521,7 +521,6 @@ function advanceStageActual(nextStage) {
 }
 
 // --- ALGORITHME DE POKER ---
-// Analyse les 7 cartes pour trouver la meilleure combinaison de 5
 function getBestHand(playerCards, communityCards) {
   const allCards = [...playerCards, ...communityCards];
   if (allCards.length < 5) return { name: "Carte Haute", score: 0 };
@@ -541,7 +540,7 @@ function getBestHand(playerCards, communityCards) {
 
   function getStraightHigh(cardsArr) {
     let uniqueVals = [...new Set(cardsArr.map(c => c.num))];
-    if (uniqueVals.includes(14)) uniqueVals.push(1); // L'As peut valoir 1
+    if (uniqueVals.includes(14)) uniqueVals.push(1); 
     uniqueVals.sort((a,b) => b - a);
     let cons = 1;
     for (let i=0; i<uniqueVals.length-1; i++) {
@@ -560,7 +559,6 @@ function getBestHand(playerCards, communityCards) {
 
   const countsArr = Object.entries(valCounts).map(([val, count]) => ({val: parseInt(val), count})).sort((a,b) => b.count - a.count || b.val - a.val);
 
-  // Hiérarchie des mains avec calcul de score pour départager
   if (straightFlushHigh) {
     if (straightFlushHigh === 14) return { name: "Quinte Flush Royale", score: 9000000 };
     return { name: "Quinte Flush", score: 8000000 + straightFlushHigh };
@@ -597,12 +595,19 @@ function activePlayersCount() {
 }
 
 function endRoundWinner(winner) {
-  gameState.stage = 'END';
-  gameState.winnerId = winner.id;
-  winner.chips += gameState.pot;
-  gameState.pot = 0;
+  // CORRECTION DU BUG DE LA CAGNOTTE :
+  // On récupère le gagnant en cherchant son ID dans la liste actuelle des joueurs.
+  // Cela empêche Firebase de cibler une ancienne version du joueur et de faire disparaître l'argent !
+  const realWinner = gameState.players.find(p => p.id === winner.id);
   
-  syncState();
+  if (realWinner) {
+    gameState.stage = 'END';
+    gameState.winnerId = realWinner.id;
+    realWinner.chips += gameState.pot;
+    gameState.pot = 0;
+    
+    syncState();
+  }
 }
 
 function syncState() {
