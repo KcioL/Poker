@@ -29,16 +29,20 @@ const opponentsZone = document.getElementById('opponents-zone');
 const myCardsEl = document.getElementById('my-cards');
 const myNameEl = document.getElementById('my-name');
 const myLastActionEl = document.getElementById('my-last-action');
+const myReloadsEl = document.getElementById('my-reloads');
 const myChipsEl = document.getElementById('my-chips');
 const elCommunityCards = document.getElementById('community-cards');
 const elPot = document.getElementById('pot-amount');
 const elGameMessage = document.getElementById('game-message');
 
 const btnStart = document.getElementById('btn-start');
+const btnRefill = document.getElementById('btn-refill');
 const actionButtons = document.getElementById('action-buttons');
 const btnFold = document.getElementById('btn-fold');
 const btnCheck = document.getElementById('btn-check');
 const btnRaise = document.getElementById('btn-raise');
+const btnAllIn = document.getElementById('btn-all-in');
+const raiseInput = document.getElementById('raise-amount');
 
 const passOverlay = document.getElementById('pass-overlay');
 const overlayTitle = document.getElementById('overlay-title');
@@ -56,6 +60,16 @@ selectMode.addEventListener('change', (e) => {
   }
 });
 
+// --- RECAVE (REFILL) LOGIC ---
+btnRefill.addEventListener('click', () => {
+  const me = gameState.players.find(p => p.id === myPlayerId);
+  if (me) {
+    me.chips += 1000;
+    me.reloads = (me.reloads || 0) + 1;
+    syncState();
+  }
+});
+
 // --- LOBBY ONLINE LOGIC ---
 btnCreateRoom.addEventListener('click', () => {
   const maxP = parseInt(document.getElementById('player-count').value);
@@ -70,7 +84,7 @@ btnCreateRoom.addEventListener('click', () => {
   set(ref(window.db, 'rooms/' + roomCode), {
     maxPlayers: maxP,
     status: 'WAITING',
-    players: { p1: { id: 'p1', name: myName, chips: 1000, cards: [], state: 'ACTIVE', lastAction: '' } },
+    players: { p1: { id: 'p1', name: myName, chips: 1000, cards: [], state: 'ACTIVE', lastAction: '', reloads: 0 } },
     gameState: { pot: 0, stage: 'START', activePlayerIndex: 0 }
   }).then(() => {
     listenToRoom();
@@ -96,7 +110,7 @@ btnJoinRoom.addEventListener('click', () => {
           
           const updates = {};
           updates['rooms/' + roomCode + '/players/' + myPlayerId] = {
-            id: myPlayerId, name: myName, chips: 1000, cards: [], state: 'ACTIVE', lastAction: ''
+            id: myPlayerId, name: myName, chips: 1000, cards: [], state: 'ACTIVE', lastAction: '', reloads: 0
           };
           update(ref(window.db), updates).then(() => {
             listenToRoom();
@@ -146,6 +160,7 @@ function initOnlineHand(playersArr) {
     p.chips -= 15; 
     p.state = 'ACTIVE';
     p.lastAction = '';
+    p.reloads = p.reloads || 0;
     p.cards = [deck.pop(), deck.pop()];
   });
   
@@ -165,13 +180,10 @@ function createDeck() {
   return d.sort(() => Math.random() - 0.5);
 }
 
-// CRÉATION DE CARTE AVEC STRUCTURE SÉPARÉE
 function createCardElement(card, hidden = false) {
-  // Le wrapper gère l'animation de base
   const wrapper = document.createElement('div');
   wrapper.className = 'card-wrapper deal-animation';
   
-  // La carte gère la 3D
   const cardEl = document.createElement('div');
   cardEl.className = 'card';
   
@@ -181,11 +193,8 @@ function createCardElement(card, hidden = false) {
       <div>${card.value}</div><div class="card-center">${card.suit}</div><div style="text-align: right;">${card.value}</div>
     </div>`;
     
-  // Un léger délai pour être sûr que l'animation de retournement se lance
   if (!hidden) {
-    setTimeout(() => {
-      cardEl.classList.add('flipped');
-    }, 100);
+    setTimeout(() => { cardEl.classList.add('flipped'); }, 50);
   }
   
   wrapper.appendChild(cardEl);
@@ -196,12 +205,16 @@ btnStart.addEventListener('click', () => {
   if (gameMode === 'online' && isHost) {
     initOnlineHand(gameState.players);
   } else {
+    // Sauvegarde des jetons et compteurs de recave existants
     let p1Chips = gameState.players[0] ? gameState.players[0].chips : 1000;
+    let p1Reloads = gameState.players[0] ? (gameState.players[0].reloads || 0) : 0;
+    
     let p2Chips = gameState.players[1] ? gameState.players[1].chips : 1000;
+    let p2Reloads = gameState.players[1] ? (gameState.players[1].reloads || 0) : 0;
 
     gameState.players = [
-      { id: 'p1', name: 'Joueur 1', chips: p1Chips, cards: [], state: 'ACTIVE', lastAction: '' },
-      { id: 'p2', name: gameMode === 'bot' ? 'Bot AI' : 'Joueur 2', chips: p2Chips, cards: [], state: 'ACTIVE', lastAction: '' }
+      { id: 'p1', name: 'Joueur 1', chips: p1Chips, cards: [], state: 'ACTIVE', lastAction: '', reloads: p1Reloads },
+      { id: 'p2', name: gameMode === 'bot' ? 'Bot AI' : 'Joueur 2', chips: p2Chips, cards: [], state: 'ACTIVE', lastAction: '', reloads: p2Reloads }
     ];
     myPlayerId = 'p1';
     startHandLocally();
@@ -239,6 +252,17 @@ function renderBoard() {
   myNameEl.textContent = me.name;
   myChipsEl.textContent = me.chips;
   
+  // Affichage du compteur de recave
+  myReloadsEl.textContent = me.reloads > 0 ? `🔄 ${me.reloads}` : '';
+  
+  // Bouton Recaver visible si 0 jeton
+  if (me.chips === 0) {
+    btnRefill.classList.remove('hidden');
+  } else {
+    btnRefill.classList.add('hidden');
+  }
+  
+  // Affichage de ma dernière action
   if (me.lastAction) {
     myLastActionEl.textContent = me.lastAction;
     myLastActionEl.classList.remove('hidden');
@@ -265,9 +289,12 @@ function renderBoard() {
     
     const infoDiv = document.createElement('div');
     infoDiv.className = 'player-info';
+    
     const actionBadge = p.lastAction ? `<span class="last-action">${p.lastAction}</span>` : '';
+    const reloadBadge = p.reloads > 0 ? `<span class="reload-badge">🔄 ${p.reloads}</span>` : '';
+    
     infoDiv.innerHTML = `
-      <span>${p.name}</span> 
+      <span>${p.name} ${reloadBadge}</span> 
       ${actionBadge}
       <span>${p.chips} €</span>
     `;
@@ -313,25 +340,51 @@ function checkTurnLogic() {
 }
 
 function botPlay() {
-  if (Math.random() > 0.75 && gameState.players[1].chips >= 50) {
-    handleAction('RAISE');
+  const bot = gameState.players[gameState.activePlayerIndex];
+  if (Math.random() > 0.75 && bot.chips >= 50) {
+    bot.chips -= 50;
+    gameState.pot += 50;
+    bot.lastAction = 'Relance (50)';
+    nextTurn();
   } else {
-    handleAction('CHECK');
+    bot.lastAction = 'Suit';
+    nextTurn();
   }
 }
 
 // --- ACTIONS JOUEURS ---
 btnCheck.addEventListener('click', () => handleAction('CHECK'));
-btnRaise.addEventListener('click', () => handleAction('RAISE'));
 btnFold.addEventListener('click', () => handleAction('FOLD'));
 
-function handleAction(action) {
+btnRaise.addEventListener('click', () => {
+  const amount = parseInt(raiseInput.value);
+  if (amount > 0) handleAction('RAISE', amount);
+});
+
+btnAllIn.addEventListener('click', () => handleAction('ALL_IN'));
+
+function handleAction(action, amount = 0) {
   const me = gameState.players[gameState.activePlayerIndex];
   
-  if (action === 'RAISE' && me.chips >= 50) {
-    me.chips -= 50;
-    gameState.pot += 50;
-    me.lastAction = 'Relance (+50)';
+  if (action === 'RAISE') {
+    if (me.chips >= amount) {
+      me.chips -= amount;
+      gameState.pot += amount;
+      me.lastAction = `Relance (${amount})`;
+    } else {
+      alert("Jetons insuffisants !");
+      return;
+    }
+  } else if (action === 'ALL_IN') {
+    if (me.chips > 0) {
+      const allInAmount = me.chips;
+      gameState.pot += allInAmount;
+      me.chips = 0;
+      me.lastAction = `Tapis ! (${allInAmount})`;
+    } else {
+      alert("Tu n'as plus de jetons !");
+      return;
+    }
   } else if (action === 'FOLD') {
     me.state = 'FOLDED';
     me.lastAction = 'Se couche';
