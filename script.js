@@ -2,9 +2,8 @@
 const SUITS = ['♠', '♥', '♦', '♣'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 
-// État du jeu unifié
 let gameState = {
-  status: 'IDLE', // IDLE, WAITING, PLAYING
+  status: 'IDLE',
   pot: 0,
   deck: [],
   communityCards: [],
@@ -13,7 +12,7 @@ let gameState = {
   players: []
 };
 
-let gameMode = 'bot'; // 'bot', 'hotseat', 'online'
+let gameMode = 'bot'; 
 let myPlayerId = 'p1'; 
 let isHost = true; 
 let roomCode = null;
@@ -132,6 +131,7 @@ function listenToRoom() {
       gameState.communityCards = data.gameState.communityCards || [];
       gameState.stage = data.gameState.stage || 'START';
       gameState.activePlayerIndex = data.gameState.activePlayerIndex || 0;
+      gameState.deck = data.gameState.deck || [];
       
       renderBoard();
       checkTurnLogic();
@@ -166,6 +166,7 @@ function createDeck() {
 function createCardElement(card, hidden = false) {
   const cardEl = document.createElement('div');
   cardEl.classList.add('card', 'deal-animation');
+  // L'ajout du hidden = false déclenche la nouvelle animation deal-flipped
   if (!hidden) cardEl.classList.add('flipped');
   
   cardEl.innerHTML = `
@@ -176,13 +177,22 @@ function createCardElement(card, hidden = false) {
   return cardEl;
 }
 
+// Le bouton gère maintenant le lancement Local ET les relances En Ligne
 btnStart.addEventListener('click', () => {
-  gameState.players = [
-    { id: 'p1', name: 'Joueur 1', chips: 1000, cards: [], state: 'ACTIVE' },
-    { id: 'p2', name: gameMode === 'bot' ? 'Bot AI' : 'Joueur 2', chips: 1000, cards: [], state: 'ACTIVE' }
-  ];
-  myPlayerId = 'p1';
-  startHandLocally();
+  if (gameMode === 'online' && isHost) {
+    initOnlineHand(gameState.players);
+  } else {
+    // Mode Local: On garde les jetons de la manche précédente si on relance
+    let p1Chips = gameState.players[0] ? gameState.players[0].chips : 1000;
+    let p2Chips = gameState.players[1] ? gameState.players[1].chips : 1000;
+
+    gameState.players = [
+      { id: 'p1', name: 'Joueur 1', chips: p1Chips, cards: [], state: 'ACTIVE' },
+      { id: 'p2', name: gameMode === 'bot' ? 'Bot AI' : 'Joueur 2', chips: p2Chips, cards: [], state: 'ACTIVE' }
+    ];
+    myPlayerId = 'p1';
+    startHandLocally();
+  }
 });
 
 function startHandLocally() {
@@ -305,6 +315,7 @@ function nextTurn() {
     return;
   }
 
+  // Dès qu'on revient au premier joueur, on avance l'étape du jeu (Flop, Turn...)
   if (gameState.activePlayerIndex === 0) {
     advanceStage();
   }
@@ -329,7 +340,7 @@ function advanceStage() {
   } else {
     gameState.stage = 'SHOWDOWN';
     elGameMessage.textContent = "Abattage des cartes !";
-    setTimeout(() => endRoundWinner(gameState.players[0]), 3000);
+    setTimeout(() => endRoundWinner(gameState.players[0]), 3000); // Simplification: le P1 gagne tout à la fin
   }
 }
 
@@ -338,9 +349,12 @@ function endRoundWinner(winner) {
   winner.chips += gameState.pot;
   gameState.pot = 0;
   
+  actionButtons.classList.add('hidden');
+  
   if (gameMode !== 'online') {
     btnStart.classList.remove('hidden');
-    actionButtons.classList.add('hidden');
+  } else if (isHost) {
+    btnStart.classList.remove('hidden'); // Seul l'hôte relance
   }
 }
 
@@ -349,19 +363,14 @@ function syncState() {
     const { ref, update } = window.firebaseRefs;
     const updates = {};
 
-    if (isHost) {
-      updates['rooms/' + roomCode + '/players'] = gameState.players.reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
-      updates['rooms/' + roomCode + '/gameState'] = { 
-         pot: gameState.pot, stage: gameState.stage, 
-         activePlayerIndex: gameState.activePlayerIndex, deck: gameState.deck, 
-         communityCards: gameState.communityCards 
-      };
-    } else {
-      const myData = gameState.players.find(p => p.id === myPlayerId);
-      updates['rooms/' + roomCode + '/players/' + myPlayerId] = myData;
-      updates['rooms/' + roomCode + '/gameState/pot'] = gameState.pot;
-      updates['rooms/' + roomCode + '/gameState/activePlayerIndex'] = gameState.activePlayerIndex;
-    }
+    // Pousser l'état global du jeu pour éviter les désynchronisations de Deck ou de Cartes Communes
+    updates['rooms/' + roomCode + '/players'] = gameState.players.reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
+    updates['rooms/' + roomCode + '/gameState'] = { 
+       pot: gameState.pot, stage: gameState.stage, 
+       activePlayerIndex: gameState.activePlayerIndex, 
+       deck: gameState.deck || [], 
+       communityCards: gameState.communityCards || [] 
+    };
     
     update(ref(window.db), updates);
   } else {
