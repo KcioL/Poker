@@ -9,8 +9,8 @@ let gameState = {
   communityCards: [],
   stage: 'START', 
   activePlayerIndex: 0,
-  dealerIndex: 0, // Indique qui est le Dealer actuel
-  actionsTaken: 0, // Compte le nombre d'actions pour savoir quand finir le tour
+  dealerIndex: 0, 
+  actionsTaken: 0, 
   winnerId: null,
   players: []
 };
@@ -139,7 +139,7 @@ function listenToRoom() {
       
       if (playersArr.length === data.maxPlayers && isHost) {
         update(ref(window.db, 'rooms/' + roomCode), { status: 'PLAYING' });
-        initOnlineHand(playersArr, 0); // Le joueur 0 est le dealer initial
+        initOnlineHand(playersArr, 0); 
       }
     } 
     else if (data.status === 'PLAYING') {
@@ -165,12 +165,11 @@ function initOnlineHand(playersArr, dealerIdx) {
   playersArr.forEach(p => {
     p.chips -= 15; 
     p.state = 'ACTIVE';
-    p.lastAction = ''; // On n'efface l'action qu'au tout début d'une nouvelle main
+    p.lastAction = ''; 
     p.reloads = p.reloads || 0;
     p.cards = [deck.pop(), deck.pop()];
   });
   
-  // Le joueur juste après le Dealer commence
   let firstActor = (dealerIdx + 1) % playersArr.length;
   
   const { ref, update } = window.firebaseRefs;
@@ -221,18 +220,15 @@ function createCardElement(card, hidden = false) {
 
 btnStart.addEventListener('click', () => {
   if (gameMode === 'online' && isHost) {
-    // Fait tourner le jeton Dealer au joueur suivant
     let nextDealer = (gameState.dealerIndex + 1) % gameState.players.length;
     initOnlineHand(gameState.players, nextDealer);
   } else {
-    // Mode local
     let p1Chips = gameState.players[0] ? gameState.players[0].chips : 1000;
     let p1Reloads = gameState.players[0] ? (gameState.players[0].reloads || 0) : 0;
     
     let p2Chips = gameState.players[1] ? gameState.players[1].chips : 1000;
     let p2Reloads = gameState.players[1] ? (gameState.players[1].reloads || 0) : 0;
     
-    // Déplace le Dealer au joueur suivant (0 ou 1)
     let nextDealer = gameState.dealerIndex !== undefined ? (gameState.dealerIndex + 1) % 2 : 0;
 
     gameState.players = [
@@ -251,8 +247,6 @@ function startHandLocally() {
   gameState.pot = 0;
   gameState.communityCards = [];
   gameState.stage = 'PREFLOP';
-  
-  // Celui qui joue en premier est toujours celui juste après le dealer
   gameState.activePlayerIndex = (gameState.dealerIndex + 1) % gameState.players.length;
   gameState.actionsTaken = 0;
   gameState.winnerId = null;
@@ -279,7 +273,6 @@ function renderBoard() {
 
   const me = gameState.players.find(p => p.id === myPlayerId);
   
-  // Badge Dealer pour Moi
   const myIndex = gameState.players.findIndex(p => p.id === myPlayerId);
   const myDBadge = gameState.dealerIndex === myIndex ? `<span class="dealer-badge">D</span>` : '';
   myNameEl.innerHTML = `${me.name} ${myDBadge}`;
@@ -315,7 +308,6 @@ function renderBoard() {
     document.getElementById('my-zone').classList.remove('active-turn');
   }
 
-  // Affichage des adversaires
   gameState.players.forEach((p, index) => {
     if (p.id === myPlayerId) return;
 
@@ -444,13 +436,11 @@ function handleAction(action, amount = 0) {
     me.lastAction = 'Suit';
   }
 
-  // On enregistre qu'un joueur de plus a joué
   gameState.actionsTaken = (gameState.actionsTaken || 0) + 1;
   nextTurn();
 }
 
 function nextTurn() {
-  // On passe au joueur actif suivant
   do {
     gameState.activePlayerIndex = (gameState.activePlayerIndex + 1) % gameState.players.length;
   } while (gameState.players[gameState.activePlayerIndex].state === 'FOLDED' && activePlayersCount() > 1);
@@ -465,17 +455,33 @@ function nextTurn() {
     return;
   }
 
-  // Vérifie si tout le monde a joué (fin du tour de mise)
   if (gameState.actionsTaken >= activePlayersCount()) {
     const next = getNextStage(gameState.stage);
     
     if (next === 'SHOWDOWN') {
         gameState.stage = 'SHOWDOWN';
-        syncState();
+        
+        // --- EVALUATION DES MAINS ---
+        let bestScore = -1;
+        let winner = null;
+        
+        gameState.players.forEach(p => {
+            if (p.state === 'ACTIVE') {
+                const handResult = getBestHand(p.cards, gameState.communityCards);
+                p.lastAction = handResult.name; // Affiche "Double Paire", etc.
+                
+                if (handResult.score > bestScore) {
+                    bestScore = handResult.score;
+                    winner = p;
+                }
+            }
+        });
+
+        syncState(); // Affiche les combinaisons à l'écran
+        
         setTimeout(() => {
-            const winner = gameState.players[0]; // Simplification
             endRoundWinner(winner);
-        }, 3000);
+        }, 4000); // 4 secondes pour que tout le monde voie les cartes
     } else {
         gameState.stage = 'PAUSE';
         syncState(); 
@@ -497,11 +503,9 @@ function getNextStage(current) {
 }
 
 function advanceStageActual(nextStage) {
-  // Plus de remise à zéro de p.lastAction ici, ça reste affiché !
   gameState.stage = nextStage;
-  gameState.actionsTaken = 0; // Remise à zéro du compteur d'actions
+  gameState.actionsTaken = 0; 
   
-  // Le premier à jouer à la prochaine étape est toujours celui après le Dealer
   gameState.activePlayerIndex = (gameState.dealerIndex + 1) % gameState.players.length;
   while (gameState.players[gameState.activePlayerIndex].state === 'FOLDED') {
       gameState.activePlayerIndex = (gameState.activePlayerIndex + 1) % gameState.players.length;
@@ -514,6 +518,78 @@ function advanceStageActual(nextStage) {
   } else if (nextStage === 'RIVER') {
     gameState.communityCards.push(gameState.deck.pop());
   }
+}
+
+// --- ALGORITHME DE POKER ---
+// Analyse les 7 cartes pour trouver la meilleure combinaison de 5
+function getBestHand(playerCards, communityCards) {
+  const allCards = [...playerCards, ...communityCards];
+  if (allCards.length < 5) return { name: "Carte Haute", score: 0 };
+
+  const valMap = {'2':2, '3':3, '4':4, '5':5, '6':6, '7':7, '8':8, '9':9, '10':10, 'J':11, 'Q':12, 'K':13, 'A':14};
+  const numCards = allCards.map(c => ({...c, num: valMap[c.value]})).sort((a,b) => b.num - a.num);
+
+  const valCounts = {};
+  const suitCounts = {};
+  numCards.forEach(c => {
+    valCounts[c.num] = (valCounts[c.num] || 0) + 1;
+    suitCounts[c.suit] = (suitCounts[c.suit] || 0) + 1;
+  });
+
+  let flushSuit = Object.keys(suitCounts).find(s => suitCounts[s] >= 5);
+  let flushCards = flushSuit ? numCards.filter(c => c.suit === flushSuit) : null;
+
+  function getStraightHigh(cardsArr) {
+    let uniqueVals = [...new Set(cardsArr.map(c => c.num))];
+    if (uniqueVals.includes(14)) uniqueVals.push(1); // L'As peut valoir 1
+    uniqueVals.sort((a,b) => b - a);
+    let cons = 1;
+    for (let i=0; i<uniqueVals.length-1; i++) {
+      if (uniqueVals[i] === uniqueVals[i+1] + 1) {
+        cons++;
+        if (cons === 5) return uniqueVals[i-3];
+      } else {
+        cons = 1;
+      }
+    }
+    return null;
+  }
+
+  const straightHigh = getStraightHigh(numCards);
+  const straightFlushHigh = flushCards ? getStraightHigh(flushCards) : null;
+
+  const countsArr = Object.entries(valCounts).map(([val, count]) => ({val: parseInt(val), count})).sort((a,b) => b.count - a.count || b.val - a.val);
+
+  // Hiérarchie des mains avec calcul de score pour départager
+  if (straightFlushHigh) {
+    if (straightFlushHigh === 14) return { name: "Quinte Flush Royale", score: 9000000 };
+    return { name: "Quinte Flush", score: 8000000 + straightFlushHigh };
+  }
+  if (countsArr[0].count === 4) {
+    return { name: "Carré", score: 7000000 + countsArr[0].val * 100 + countsArr[1].val };
+  }
+  if (countsArr[0].count === 3 && countsArr.length > 1 && countsArr[1].count >= 2) {
+    return { name: "Full", score: 6000000 + countsArr[0].val * 100 + countsArr[1].val };
+  }
+  if (flushCards) {
+    const score = flushCards.slice(0,5).reduce((acc, c, i) => acc + c.num * Math.pow(16, 4-i), 0);
+    return { name: "Couleur", score: 5000000 + score };
+  }
+  if (straightHigh) {
+    return { name: "Quinte", score: 4000000 + straightHigh };
+  }
+  if (countsArr[0].count === 3) {
+    return { name: "Brelan", score: 3000000 + countsArr[0].val * 10000 + countsArr[1].val * 100 + countsArr[2].val };
+  }
+  if (countsArr[0].count === 2 && countsArr.length > 1 && countsArr[1].count === 2) {
+    return { name: "Double Paire", score: 2000000 + countsArr[0].val * 10000 + countsArr[1].val * 100 + countsArr[2].val };
+  }
+  if (countsArr[0].count === 2) {
+    return { name: "Paire", score: 1000000 + countsArr[0].val * 100000 + countsArr[1].val * 1000 + countsArr[2].val * 10 + countsArr[3].val };
+  }
+  
+  const score = numCards.slice(0,5).reduce((acc, c, i) => acc + c.num * Math.pow(16, 4-i), 0);
+  return { name: "Carte Haute", score: score };
 }
 
 function activePlayersCount() {
