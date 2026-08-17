@@ -125,9 +125,9 @@ body {
   100% { opacity: 1; top: 0; }
 }
 
-/* Le retournement (Flip) fonctionne désormais toujours ! */
+/* Le retournement (Flip) fonctionne désormais toujours, quoi qu'il arrive ! */
 .card.flipped {
-  transform: rotateY(180deg);
+  transform: rotateY(180deg) !important;
 }
 
 .card-face {
