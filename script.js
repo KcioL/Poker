@@ -48,10 +48,6 @@ const btnRaise = document.getElementById('btn-raise');
 const btnAllIn = document.getElementById('btn-all-in');
 const raiseInput = document.getElementById('raise-amount');
 
-const passOverlay = document.getElementById('pass-overlay');
-const overlayTitle = document.getElementById('overlay-title');
-const btnReady = document.getElementById('btn-ready');
-
 // --- CHANGEMENT DE MODE ---
 selectMode.addEventListener('change', (e) => {
   gameMode = e.target.value;
@@ -165,7 +161,6 @@ function listenToRoom() {
 function initOnlineHand(playersArr, dealerIdx) {
   const deck = createDeck();
   playersArr.forEach(p => {
-    // AUTO-RECAVE si le joueur n'a pas de quoi payer la petite blinde
     if (p.chips < 10) {
         p.chips += 1000;
         p.reloads = (p.reloads || 0) + 1;
@@ -241,7 +236,7 @@ btnStart.addEventListener('click', () => {
 
     gameState.players = [
       { id: 'p1', name: 'Joueur 1', chips: p1Chips, cards: [], state: 'ACTIVE', lastAction: '', reloads: p1Reloads, currentBet: 0 },
-      { id: 'p2', name: gameMode === 'bot' ? 'Bot AI' : 'Joueur 2', chips: p2Chips, cards: [], state: 'ACTIVE', lastAction: '', reloads: p2Reloads, currentBet: 0 }
+      { id: 'p2', name: 'Bot AI', chips: p2Chips, cards: [], state: 'ACTIVE', lastAction: '', reloads: p2Reloads, currentBet: 0 }
     ];
     gameState.dealerIndex = nextDealer;
     myPlayerId = 'p1';
@@ -261,7 +256,6 @@ function startHandLocally() {
   gameState.winnerId = null;
 
   gameState.players.forEach(p => {
-    // AUTO-RECAVE si le joueur n'a pas de quoi payer la petite blinde
     if (p.chips < 10) {
         p.chips += 1000;
         p.reloads = (p.reloads || 0) + 1;
@@ -311,8 +305,8 @@ function renderBoard() {
   
   if (me.cards) {
     me.cards.forEach(c => {
-      let hidden = (gameMode === 'hotseat' && gameState.players[gameState.activePlayerIndex]?.id !== myPlayerId);
-      myCardsEl.appendChild(createCardElement(c, hidden));
+      // Mes propres cartes sont toujours visibles
+      myCardsEl.appendChild(createCardElement(c, false));
     });
   }
 
@@ -347,7 +341,7 @@ function renderBoard() {
     cardsContainer.className = 'cards-container';
 
     if (p.cards && p.cards.length > 0) {
-      const showCards = (gameState.stage === 'SHOWDOWN' || gameState.stage === 'END') || (gameMode === 'hotseat' && index === gameState.activePlayerIndex);
+      const showCards = (gameState.stage === 'SHOWDOWN' || gameState.stage === 'END');
       p.cards.forEach(c => {
          cardsContainer.appendChild(createCardElement(c, !showCards));
       });
@@ -384,17 +378,13 @@ function checkTurnLogic() {
   elGameMessage.textContent = activePlayer.id === myPlayerId ? "C'est à vous de jouer !" : `Tour de ${activePlayer.name}...`;
 
   if (activePlayer.id === myPlayerId) {
-    if (gameMode === 'hotseat' && myCardsEl.innerHTML === '') {
-       promptHotseatSwap(activePlayer.name);
+    let callAmount = (gameState.currentBet || 0) - (activePlayer.currentBet || 0);
+    if (callAmount > 0) {
+      btnCheck.textContent = `Suivre (${callAmount}€)`;
     } else {
-       let callAmount = (gameState.currentBet || 0) - (activePlayer.currentBet || 0);
-       if (callAmount > 0) {
-         btnCheck.textContent = `Suivre (${callAmount}€)`;
-       } else {
-         btnCheck.textContent = "Check (Parole)";
-       }
-       actionButtons.classList.remove('hidden');
+      btnCheck.textContent = "Check (Parole)";
     }
+    actionButtons.classList.remove('hidden');
   } else {
     actionButtons.classList.add('hidden');
     if (gameMode === 'bot' && isHost) {
@@ -485,7 +475,6 @@ function handleAction(action, amount = 0) {
     gameState.actionsTaken = (gameState.actionsTaken || 0) + 1;
   }
 
-  // FORCE L'ÉTAT "ALL_IN" POUR NE PLUS DONNER LE TOUR À CE JOUEUR
   if (me.chips === 0 && me.state !== 'FOLDED') {
       me.state = 'ALL_IN';
   }
@@ -496,7 +485,6 @@ function handleAction(action, amount = 0) {
 function nextTurn() {
   const alivePlayers = gameState.players.filter(p => p.state !== 'FOLDED');
 
-  // Condition 1 : Tout le monde s'est couché sauf un joueur
   if (alivePlayers.length === 1) {
     gameState.stage = 'PAUSE'; 
     elGameMessage.textContent = "Fin de la manche...";
@@ -507,17 +495,14 @@ function nextTurn() {
     return;
   }
 
-  // Est-ce que le tour d'enchère actuel est terminé ?
   const activePlayers = gameState.players.filter(p => p.state === 'ACTIVE');
   const allMatched = activePlayers.every(p => p.currentBet === gameState.currentBet);
   const roundFinished = allMatched && (gameState.actionsTaken >= activePlayers.length || activePlayers.length === 0);
 
   if (roundFinished) {
-    // Condition 2 : S'il y a 1 seul (ou 0) joueur ACTIF restant (et que les autres sont ALL-IN)
     if (activePlayers.length <= 1) {
         fastForwardShowdown();
     } else {
-        // La partie continue normalement
         const next = getNextStage(gameState.stage);
         if (next === 'SHOWDOWN') {
             gameState.stage = 'SHOWDOWN';
@@ -535,7 +520,6 @@ function nextTurn() {
     return;
   }
 
-  // Cherche le prochain joueur ACTIF
   let loopGuard = 0;
   do {
     gameState.activePlayerIndex = (gameState.activePlayerIndex + 1) % gameState.players.length;
@@ -551,7 +535,6 @@ function fastForwardShowdown() {
   syncState();
 
   setTimeout(() => {
-      // Distribue d'un coup toutes les cartes manquantes au centre
       while (gameState.communityCards.length < 5) {
           gameState.communityCards.push(gameState.deck.pop());
       }
@@ -595,12 +578,10 @@ function advanceStageActual(nextStage) {
   gameState.actionsTaken = 0; 
   gameState.currentBet = 0;
   
-  // Remise à zéro de l'engagement pour le nouveau tour
   gameState.players.forEach(p => {
       if (p.state === 'ACTIVE' || p.state === 'ALL_IN') p.currentBet = 0;
   });
   
-  // Défini qui joue en premier au nouveau tour
   let nextPlayer = (gameState.dealerIndex + 1) % gameState.players.length;
   let loopGuard = 0;
   while (gameState.players[nextPlayer].state !== 'ACTIVE' && loopGuard < gameState.players.length) {
@@ -725,17 +706,3 @@ function syncState() {
     checkTurnLogic();
   }
 }
-
-function promptHotseatSwap(name) {
-  document.getElementById('my-zone').classList.remove('active-turn');
-  myCardsEl.innerHTML = '';
-  overlayTitle.textContent = `Au tour de : ${name}`;
-  passOverlay.classList.remove('hidden');
-}
-
-btnReady.addEventListener('click', () => {
-  passOverlay.classList.add('hidden');
-  myPlayerId = gameState.players[gameState.activePlayerIndex].id; 
-  renderBoard();
-  actionButtons.classList.remove('hidden');
-});
