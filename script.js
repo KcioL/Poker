@@ -1,11 +1,11 @@
-// CONSTANTES & VARIABLES GLOBALES
+// --- CONSTANTES & VARIABLES GLOBALES ---
 const SUITS = ['♠', '♥', '♦', '♣'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 
 let gameState = {
   status: 'IDLE',
   pot: 0,
-  currentBet: 0, // Retient la mise la plus haute en cours
+  currentBet: 0, 
   deck: [],
   communityCards: [],
   stage: 'START', 
@@ -21,7 +21,7 @@ let myPlayerId = 'p1';
 let isHost = true; 
 let roomCode = null;
 
-// ÉLÉMENTS DOM
+// --- ÉLÉMENTS DOM ---
 const selectMode = document.getElementById('select-mode');
 const onlineLobby = document.getElementById('online-lobby');
 const playerNameInput = document.getElementById('player-name-input');
@@ -52,7 +52,7 @@ const passOverlay = document.getElementById('pass-overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const btnReady = document.getElementById('btn-ready');
 
-// CHANGEMENT DE MODE 
+// --- CHANGEMENT DE MODE ---
 selectMode.addEventListener('change', (e) => {
   gameMode = e.target.value;
   if (gameMode === 'online') {
@@ -64,7 +64,7 @@ selectMode.addEventListener('change', (e) => {
   }
 });
 
-// RECAVE (REFILL) LOGIC
+// --- RECAVE (REFILL) LOGIC MANUEL ---
 btnRefill.addEventListener('click', () => {
   const me = gameState.players.find(p => p.id === myPlayerId);
   if (me) {
@@ -74,7 +74,7 @@ btnRefill.addEventListener('click', () => {
   }
 });
 
-// LOBBY ONLINE LOGIC
+// --- LOBBY ONLINE LOGIC ---
 btnCreateRoom.addEventListener('click', () => {
   const maxP = parseInt(document.getElementById('player-count').value);
   const myName = playerNameInput.value.trim() || "Johnny Sins";
@@ -165,11 +165,15 @@ function listenToRoom() {
 function initOnlineHand(playersArr, dealerIdx) {
   const deck = createDeck();
   playersArr.forEach(p => {
+    // AUTO-RECAVE si le joueur n'a pas de quoi payer la petite blinde
+    if (p.chips < 10) {
+        p.chips += 1000;
+        p.reloads = (p.reloads || 0) + 1;
+    }
     p.chips -= 10; 
     p.state = 'ACTIVE';
     p.lastAction = ''; 
-    p.reloads = p.reloads || 0;
-    p.currentBet = 10; // Chaque joueur paie la petite blinde
+    p.currentBet = 10; 
     p.cards = [deck.pop(), deck.pop()];
   });
   
@@ -180,7 +184,7 @@ function initOnlineHand(playersArr, dealerIdx) {
     'players': playersArr.reduce((acc, p) => ({ ...acc, [p.id]: p }), {}),
     'gameState': { 
         pot: playersArr.length * 10, 
-        currentBet: 10, // La blinde fixe la première mise à 10
+        currentBet: 10, 
         stage: 'PREFLOP', 
         activePlayerIndex: firstActor, 
         dealerIndex: dealerIdx,
@@ -192,7 +196,7 @@ function initOnlineHand(playersArr, dealerIdx) {
   });
 }
 
-// LOGIQUE DU JEU (LOCAL & ONLINE)
+// --- LOGIQUE DU JEU (LOCAL & ONLINE) ---
 function createDeck() {
   let d = [];
   for (let suit of SUITS) {
@@ -257,6 +261,11 @@ function startHandLocally() {
   gameState.winnerId = null;
 
   gameState.players.forEach(p => {
+    // AUTO-RECAVE si le joueur n'a pas de quoi payer la petite blinde
+    if (p.chips < 10) {
+        p.chips += 1000;
+        p.reloads = (p.reloads || 0) + 1;
+    }
     p.chips -= 10;
     gameState.pot += 10;
     p.state = 'ACTIVE';
@@ -270,7 +279,7 @@ function startHandLocally() {
   checkTurnLogic();
 }
 
-// AFFICHAGE GRAPHIQUE
+// --- AFFICHAGE GRAPHIQUE ---
 function renderBoard() {
   elPot.textContent = gameState.pot;
   opponentsZone.innerHTML = '';
@@ -278,7 +287,8 @@ function renderBoard() {
   elCommunityCards.innerHTML = '';
 
   const me = gameState.players.find(p => p.id === myPlayerId);
-  
+  if(!me) return;
+
   const myIndex = gameState.players.findIndex(p => p.id === myPlayerId);
   const myDBadge = gameState.dealerIndex === myIndex ? `<span class="dealer-badge">D</span>` : '';
   myNameEl.innerHTML = `${me.name} ${myDBadge}`;
@@ -355,35 +365,28 @@ function renderBoard() {
 
 // --- GESTION DES TOURS ---
 function checkTurnLogic() {
-  if (gameState.stage === 'END') {
+  if (['PAUSE', 'SHOWDOWN', 'END'].includes(gameState.stage)) {
       actionButtons.classList.add('hidden');
-      const winner = gameState.players.find(p => p.id === gameState.winnerId);
-      if (winner) elGameMessage.textContent = `${winner.name} remporte la manche !`;
       
-      if (gameMode !== 'online' || isHost) btnStart.classList.remove('hidden');
-      return;
-  }
-  
-  if (gameState.stage === 'PAUSE') {
-      actionButtons.classList.add('hidden');
-      elGameMessage.textContent = activePlayersCount() === 1 ? "Fin de la manche..." : "Distribution...";
-      return;
-  }
-  
-  if (gameState.stage === 'SHOWDOWN') {
-      actionButtons.classList.add('hidden');
-      elGameMessage.textContent = "Abattage des cartes !";
+      if (gameState.stage === 'END') {
+          const winner = gameState.players.find(p => p.id === gameState.winnerId);
+          if (winner) elGameMessage.textContent = `${winner.name} remporte la manche !`;
+          if (gameMode !== 'online' || isHost) btnStart.classList.remove('hidden');
+      } else if (gameState.stage === 'SHOWDOWN') {
+          elGameMessage.textContent = "Abattage des cartes !";
+      }
       return;
   }
 
   const activePlayer = gameState.players[gameState.activePlayerIndex];
+  if (!activePlayer || activePlayer.state !== 'ACTIVE') return;
+
   elGameMessage.textContent = activePlayer.id === myPlayerId ? "C'est à vous de jouer !" : `Tour de ${activePlayer.name}...`;
 
   if (activePlayer.id === myPlayerId) {
     if (gameMode === 'hotseat' && myCardsEl.innerHTML === '') {
        promptHotseatSwap(activePlayer.name);
     } else {
-       // Modification dynamique du bouton Suivre/Check 
        let callAmount = (gameState.currentBet || 0) - (activePlayer.currentBet || 0);
        if (callAmount > 0) {
          btnCheck.textContent = `Suivre (${callAmount}€)`;
@@ -402,6 +405,8 @@ function checkTurnLogic() {
 
 function botPlay() {
   const bot = gameState.players[gameState.activePlayerIndex];
+  if (!bot || bot.state !== 'ACTIVE') return;
+
   let callAmount = (gameState.currentBet || 0) - (bot.currentBet || 0);
   
   if (Math.random() > 0.75 && bot.chips >= callAmount + 50) {
@@ -427,15 +432,13 @@ function handleAction(action, amount = 0) {
   let callAmount = (gameState.currentBet || 0) - (me.currentBet || 0);
   
   if (action === 'RAISE') {
-    let totalToPay = callAmount + amount; // Il paie la différence + la relance
+    let totalToPay = callAmount + amount; 
     if (me.chips >= totalToPay) {
       me.chips -= totalToPay;
       gameState.pot += totalToPay;
       gameState.currentBet = (gameState.currentBet || 0) + amount;
       me.currentBet = gameState.currentBet;
       me.lastAction = `Relance (+${amount})`;
-      
-      // La relance remet le compteur d'action à 1, obligeant les autres à jouer
       gameState.actionsTaken = 1; 
     } else {
       alert("Jetons insuffisants !");
@@ -450,7 +453,7 @@ function handleAction(action, amount = 0) {
       me.lastAction = `Tapis ! (${allInAmount})`;
 
       if (me.currentBet > gameState.currentBet) {
-        gameState.currentBet = me.currentBet; // S'il relance avec son tapis
+        gameState.currentBet = me.currentBet; 
         gameState.actionsTaken = 1; 
       } else {
         gameState.actionsTaken = (gameState.actionsTaken || 0) + 1;
@@ -471,7 +474,6 @@ function handleAction(action, amount = 0) {
         me.currentBet = gameState.currentBet;
         me.lastAction = 'Suit';
       } else {
-        // Tapis forcé s'il n'a pas assez pour suivre
         gameState.pot += me.chips;
         me.currentBet += me.chips;
         me.chips = 0;
@@ -483,63 +485,102 @@ function handleAction(action, amount = 0) {
     gameState.actionsTaken = (gameState.actionsTaken || 0) + 1;
   }
 
+  // FORCE L'ÉTAT "ALL_IN" POUR NE PLUS DONNER LE TOUR À CE JOUEUR
+  if (me.chips === 0 && me.state !== 'FOLDED') {
+      me.state = 'ALL_IN';
+  }
+
   nextTurn();
 }
 
 function nextTurn() {
-  do {
-    gameState.activePlayerIndex = (gameState.activePlayerIndex + 1) % gameState.players.length;
-  } while (gameState.players[gameState.activePlayerIndex].state === 'FOLDED' && activePlayersCount() > 1);
+  const alivePlayers = gameState.players.filter(p => p.state !== 'FOLDED');
 
-  if (activePlayersCount() === 1) {
+  // Condition 1 : Tout le monde s'est couché sauf un joueur
+  if (alivePlayers.length === 1) {
     gameState.stage = 'PAUSE'; 
+    elGameMessage.textContent = "Fin de la manche...";
     syncState(); 
     setTimeout(() => {
-      const winner = gameState.players.find(p => p.state === 'ACTIVE');
-      endRoundWinner(winner);
+      endRoundWinner(alivePlayers[0]);
     }, 2000);
     return;
   }
 
-  // Le tour se termine quand tout le monde a pris une décision par rapport à la dernière mise
-  if (gameState.actionsTaken >= activePlayersCount()) {
-    const next = getNextStage(gameState.stage);
-    
-    if (next === 'SHOWDOWN') {
-        gameState.stage = 'SHOWDOWN';
-        
-        //EVALUATION DES MAINS
-        let bestScore = -1;
-        let winner = null;
-        
-        gameState.players.forEach(p => {
-            if (p.state === 'ACTIVE') {
-                const handResult = getBestHand(p.cards, gameState.communityCards);
-                p.lastAction = handResult.name; 
-                
-                if (handResult.score > bestScore) {
-                    bestScore = handResult.score;
-                    winner = p;
-                }
-            }
-        });
+  // Est-ce que le tour d'enchère actuel est terminé ?
+  const activePlayers = gameState.players.filter(p => p.state === 'ACTIVE');
+  const allMatched = activePlayers.every(p => p.currentBet === gameState.currentBet);
+  const roundFinished = allMatched && (gameState.actionsTaken >= activePlayers.length || activePlayers.length === 0);
 
-        syncState(); 
-        
-        setTimeout(() => {
-            endRoundWinner(winner);
-        }, 4000); 
+  if (roundFinished) {
+    // Condition 2 : S'il y a 1 seul (ou 0) joueur ACTIF restant (et que les autres sont ALL-IN)
+    if (activePlayers.length <= 1) {
+        fastForwardShowdown();
     } else {
-        gameState.stage = 'PAUSE';
-        syncState(); 
-        setTimeout(() => {
-            advanceStageActual(next);
-            syncState();
-        }, 2000);
+        // La partie continue normalement
+        const next = getNextStage(gameState.stage);
+        if (next === 'SHOWDOWN') {
+            gameState.stage = 'SHOWDOWN';
+            triggerShowdownEval();
+        } else {
+            gameState.stage = 'PAUSE';
+            elGameMessage.textContent = "Distribution...";
+            syncState(); 
+            setTimeout(() => {
+                advanceStageActual(next);
+                syncState();
+            }, 2000);
+        }
     }
-  } else {
-    syncState(); 
+    return;
   }
+
+  // Cherche le prochain joueur ACTIF
+  let loopGuard = 0;
+  do {
+    gameState.activePlayerIndex = (gameState.activePlayerIndex + 1) % gameState.players.length;
+    loopGuard++;
+  } while (gameState.players[gameState.activePlayerIndex].state !== 'ACTIVE' && loopGuard <= gameState.players.length);
+
+  syncState(); 
+}
+
+function fastForwardShowdown() {
+  gameState.stage = 'PAUSE';
+  elGameMessage.textContent = "Tapis ! Distribution du reste...";
+  syncState();
+
+  setTimeout(() => {
+      // Distribue d'un coup toutes les cartes manquantes au centre
+      while (gameState.communityCards.length < 5) {
+          gameState.communityCards.push(gameState.deck.pop());
+      }
+      gameState.stage = 'SHOWDOWN';
+      triggerShowdownEval();
+  }, 2000);
+}
+
+function triggerShowdownEval() {
+  let bestScore = -1;
+  let winner = null;
+  
+  gameState.players.forEach(p => {
+      if (p.state !== 'FOLDED') {
+          const handResult = getBestHand(p.cards, gameState.communityCards);
+          p.lastAction = handResult.name; 
+          
+          if (handResult.score > bestScore) {
+              bestScore = handResult.score;
+              winner = p;
+          }
+      }
+  });
+
+  syncState(); 
+  
+  setTimeout(() => {
+      endRoundWinner(winner);
+  }, 4000); 
 }
 
 function getNextStage(current) {
@@ -552,14 +593,21 @@ function getNextStage(current) {
 function advanceStageActual(nextStage) {
   gameState.stage = nextStage;
   gameState.actionsTaken = 0; 
-  gameState.currentBet = 0; // Remise à 0 de la mise du nouveau tour
+  gameState.currentBet = 0;
   
-  gameState.players.forEach(p => p.currentBet = 0); // Remise à 0 de l'engagement
+  // Remise à zéro de l'engagement pour le nouveau tour
+  gameState.players.forEach(p => {
+      if (p.state === 'ACTIVE' || p.state === 'ALL_IN') p.currentBet = 0;
+  });
   
-  gameState.activePlayerIndex = (gameState.dealerIndex + 1) % gameState.players.length;
-  while (gameState.players[gameState.activePlayerIndex].state === 'FOLDED') {
-      gameState.activePlayerIndex = (gameState.activePlayerIndex + 1) % gameState.players.length;
+  // Défini qui joue en premier au nouveau tour
+  let nextPlayer = (gameState.dealerIndex + 1) % gameState.players.length;
+  let loopGuard = 0;
+  while (gameState.players[nextPlayer].state !== 'ACTIVE' && loopGuard < gameState.players.length) {
+      nextPlayer = (nextPlayer + 1) % gameState.players.length;
+      loopGuard++;
   }
+  gameState.activePlayerIndex = nextPlayer;
   
   if (nextStage === 'FLOP') {
     gameState.communityCards.push(gameState.deck.pop(), gameState.deck.pop(), gameState.deck.pop());
@@ -570,7 +618,7 @@ function advanceStageActual(nextStage) {
   }
 }
 
-// ALGORITHME DE POKER 
+// --- ALGORITHME DE POKER ---
 function getBestHand(playerCards, communityCards) {
   const allCards = [...playerCards, ...communityCards];
   if (allCards.length < 5) return { name: "Carte Haute", score: 0 };
@@ -638,10 +686,6 @@ function getBestHand(playerCards, communityCards) {
   
   const score = numCards.slice(0,5).reduce((acc, c, i) => acc + c.num * Math.pow(16, 4-i), 0);
   return { name: "Carte Haute", score: score };
-}
-
-function activePlayersCount() {
-  return gameState.players.filter(p => p.state === 'ACTIVE').length;
 }
 
 function endRoundWinner(winner) {
