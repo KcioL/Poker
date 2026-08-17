@@ -167,21 +167,19 @@ function createDeck() {
 
 function createCardElement(card, hidden = false) {
   const cardEl = document.createElement('div');
-  cardEl.classList.add('card', 'deal-animation');
+  cardEl.className = 'card deal-animation';
   
+  // On applique la classe 'flipped' de manière synchrone
+  if (!hidden) {
+    cardEl.classList.add('flipped');
+  }
+
   cardEl.innerHTML = `
     <div class="card-face card-back"></div>
     <div class="card-face card-front ${card.isRed ? 'red' : ''}">
       <div>${card.value}</div><div class="card-center">${card.suit}</div><div style="text-align: right;">${card.value}</div>
     </div>`;
-    
-  // On force le retournement avec un micro-délai pour déclencher l'animation 3D
-  if (!hidden) {
-    setTimeout(() => {
-      cardEl.classList.add('flipped');
-    }, 50);
-  }
-  
+
   return cardEl;
 }
 
@@ -247,6 +245,7 @@ function renderBoard() {
     });
   }
 
+  // Construction des adversaires en évitant .outerHTML pour préserver le DOM
   gameState.players.forEach((p, index) => {
     if (p.id === myPlayerId) {
       if (index === gameState.activePlayerIndex) document.getElementById('my-zone').classList.add('active-turn');
@@ -257,28 +256,31 @@ function renderBoard() {
     const oppDiv = document.createElement('div');
     oppDiv.className = `player-zone ${p.state === 'FOLDED' ? 'folded' : ''} ${index === gameState.activePlayerIndex ? 'active-turn' : ''}`;
     
-    let cardsHTML = '';
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'player-info';
+    const actionBadge = p.lastAction ? `<span class="last-action">${p.lastAction}</span>` : '';
+    infoDiv.innerHTML = `
+      <span>${p.name}</span> 
+      ${actionBadge}
+      <span>${p.chips} €</span>
+    `;
+
+    const cardsContainer = document.createElement('div');
+    cardsContainer.className = 'cards-container';
+
     if (p.cards && p.cards.length > 0) {
       const showCards = (gameState.stage === 'SHOWDOWN') || (gameMode === 'hotseat' && index === gameState.activePlayerIndex);
       p.cards.forEach(c => {
-         cardsHTML += createCardElement(c, !showCards).outerHTML;
+         cardsContainer.appendChild(createCardElement(c, !showCards));
       });
     }
 
-    // Ajout du badge d'action pour les adversaires
-    const actionBadge = p.lastAction ? `<span class="last-action">${p.lastAction}</span>` : '';
-
-    oppDiv.innerHTML = `
-      <div class="player-info">
-        <span>${p.name}</span> 
-        ${actionBadge}
-        <span>${p.chips} €</span>
-      </div>
-      <div class="cards-container">${cardsHTML}</div>
-    `;
+    oppDiv.appendChild(infoDiv);
+    oppDiv.appendChild(cardsContainer);
     opponentsZone.appendChild(oppDiv);
   });
 
+  // Construction des cartes communes
   gameState.communityCards.forEach(c => {
     elCommunityCards.appendChild(createCardElement(c, false));
   });
@@ -305,7 +307,7 @@ function checkTurnLogic() {
 }
 
 function botPlay() {
-  // L'IA décide de relancer dans 25% des cas si elle a assez de jetons
+  // L'IA décide de relancer dans 25% des cas
   if (Math.random() > 0.75 && gameState.players[1].chips >= 50) {
     handleAction('RAISE');
   } else {
