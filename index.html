@@ -32,14 +32,13 @@
 <body>
   <div class="poker-container">
     <header class="game-header">
-      <h1>P'tit Poker Mémor</h1>
+      <h1>Texas Hold'em</h1>
       
       <!-- Sélecteur de mode -->
       <div class="mode-select">
         <label for="select-mode">Mode :</label>
         <select id="select-mode">
           <option value="bot">Vs Bot AI</option>
-          <option value="hotseat">2 Joueurs (Même PC)</option>
           <option value="online">Multijoueur En Ligne</option>
         </select>
       </div>
@@ -112,17 +111,8 @@
           <button id="btn-raise" class="btn btn-success">Relancer</button>
         </div>
         
-        <button id="btn-all-in" class="btn btn-warning">ALL IN !!!</button>
+        <button id="btn-all-in" class="btn btn-warning">Tapis !</button>
       </div>
-    </div>
-  </div>
-
-  <!-- Écran passe-et-joue (Hotseat) -->
-  <div id="pass-overlay" class="overlay hidden">
-    <div class="overlay-card">
-      <h2 id="overlay-title">Au tour de...</h2>
-      <p>Passez le PC au joueur concerné. Cliquez sur le bouton quand vous êtes prêt.</p>
-      <button id="btn-ready" class="btn btn-start">Je suis prêt !</button>
     </div>
   </div>
 
