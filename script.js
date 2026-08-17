@@ -7,8 +7,11 @@ let gameState = {
   pot: 0,
   deck: [],
   communityCards: [],
-  stage: 'START',
+  stage: 'START', 
   activePlayerIndex: 0,
+  dealerIndex: 0, // Indique qui est le Dealer actuel
+  actionsTaken: 0, // Compte le nombre d'actions pour savoir quand finir le tour
+  winnerId: null,
   players: []
 };
 
@@ -85,7 +88,7 @@ btnCreateRoom.addEventListener('click', () => {
     maxPlayers: maxP,
     status: 'WAITING',
     players: { p1: { id: 'p1', name: myName, chips: 1000, cards: [], state: 'ACTIVE', lastAction: '', reloads: 0 } },
-    gameState: { pot: 0, stage: 'START', activePlayerIndex: 0 }
+    gameState: { pot: 0, stage: 'START', activePlayerIndex: 0, dealerIndex: 0, actionsTaken: 0, winnerId: null }
   }).then(() => {
     listenToRoom();
   });
@@ -136,7 +139,7 @@ function listenToRoom() {
       
       if (playersArr.length === data.maxPlayers && isHost) {
         update(ref(window.db, 'rooms/' + roomCode), { status: 'PLAYING' });
-        initOnlineHand(playersArr);
+        initOnlineHand(playersArr, 0); // Le joueur 0 est le dealer initial
       }
     } 
     else if (data.status === 'PLAYING') {
@@ -146,7 +149,10 @@ function listenToRoom() {
       gameState.communityCards = data.gameState.communityCards || [];
       gameState.stage = data.gameState.stage || 'START';
       gameState.activePlayerIndex = data.gameState.activePlayerIndex || 0;
+      gameState.dealerIndex = data.gameState.dealerIndex || 0;
+      gameState.actionsTaken = data.gameState.actionsTaken || 0;
       gameState.deck = data.gameState.deck || [];
+      gameState.winnerId = data.gameState.winnerId || null;
       
       renderBoard();
       checkTurnLogic();
@@ -154,20 +160,32 @@ function listenToRoom() {
   });
 }
 
-function initOnlineHand(playersArr) {
+function initOnlineHand(playersArr, dealerIdx) {
   const deck = createDeck();
   playersArr.forEach(p => {
     p.chips -= 15; 
     p.state = 'ACTIVE';
-    p.lastAction = '';
+    p.lastAction = ''; // On n'efface l'action qu'au tout début d'une nouvelle main
     p.reloads = p.reloads || 0;
     p.cards = [deck.pop(), deck.pop()];
   });
   
+  // Le joueur juste après le Dealer commence
+  let firstActor = (dealerIdx + 1) % playersArr.length;
+  
   const { ref, update } = window.firebaseRefs;
   update(ref(window.db, 'rooms/' + roomCode), {
     'players': playersArr.reduce((acc, p) => ({ ...acc, [p.id]: p }), {}),
-    'gameState': { pot: playersArr.length * 15, stage: 'PREFLOP', activePlayerIndex: 0, deck: deck, communityCards: [] }
+    'gameState': { 
+        pot: playersArr.length * 15, 
+        stage: 'PREFLOP', 
+        activePlayerIndex: firstActor, 
+        dealerIndex: dealerIdx,
+        actionsTaken: 0,
+        deck: deck, 
+        communityCards: [],
+        winnerId: null 
+    }
   });
 }
 
@@ -203,20 +221,27 @@ function createCardElement(card, hidden = false) {
 
 btnStart.addEventListener('click', () => {
   if (gameMode === 'online' && isHost) {
-    initOnlineHand(gameState.players);
+    // Fait tourner le jeton Dealer au joueur suivant
+    let nextDealer = (gameState.dealerIndex + 1) % gameState.players.length;
+    initOnlineHand(gameState.players, nextDealer);
   } else {
-    // Sauvegarde des jetons et compteurs de recave existants
+    // Mode local
     let p1Chips = gameState.players[0] ? gameState.players[0].chips : 1000;
     let p1Reloads = gameState.players[0] ? (gameState.players[0].reloads || 0) : 0;
     
     let p2Chips = gameState.players[1] ? gameState.players[1].chips : 1000;
     let p2Reloads = gameState.players[1] ? (gameState.players[1].reloads || 0) : 0;
+    
+    // Déplace le Dealer au joueur suivant (0 ou 1)
+    let nextDealer = gameState.dealerIndex !== undefined ? (gameState.dealerIndex + 1) % 2 : 0;
 
     gameState.players = [
       { id: 'p1', name: 'Joueur 1', chips: p1Chips, cards: [], state: 'ACTIVE', lastAction: '', reloads: p1Reloads },
       { id: 'p2', name: gameMode === 'bot' ? 'Bot AI' : 'Joueur 2', chips: p2Chips, cards: [], state: 'ACTIVE', lastAction: '', reloads: p2Reloads }
     ];
+    gameState.dealerIndex = nextDealer;
     myPlayerId = 'p1';
+    
     startHandLocally();
   }
 });
@@ -226,7 +251,11 @@ function startHandLocally() {
   gameState.pot = 0;
   gameState.communityCards = [];
   gameState.stage = 'PREFLOP';
-  gameState.activePlayerIndex = 0;
+  
+  // Celui qui joue en premier est toujours celui juste après le dealer
+  gameState.activePlayerIndex = (gameState.dealerIndex + 1) % gameState.players.length;
+  gameState.actionsTaken = 0;
+  gameState.winnerId = null;
 
   gameState.players.forEach(p => {
     p.chips -= 15;
@@ -249,20 +278,21 @@ function renderBoard() {
   elCommunityCards.innerHTML = '';
 
   const me = gameState.players.find(p => p.id === myPlayerId);
-  myNameEl.textContent = me.name;
-  myChipsEl.textContent = me.chips;
   
-  // Affichage du compteur de recave
+  // Badge Dealer pour Moi
+  const myIndex = gameState.players.findIndex(p => p.id === myPlayerId);
+  const myDBadge = gameState.dealerIndex === myIndex ? `<span class="dealer-badge">D</span>` : '';
+  myNameEl.innerHTML = `${me.name} ${myDBadge}`;
+  
+  myChipsEl.textContent = me.chips;
   myReloadsEl.textContent = me.reloads > 0 ? `🔄 ${me.reloads}` : '';
   
-  // Bouton Recaver visible si 0 jeton
-  if (me.chips === 0) {
+  if (me.chips === 0 && gameState.stage === 'END') {
     btnRefill.classList.remove('hidden');
   } else {
     btnRefill.classList.add('hidden');
   }
   
-  // Affichage de ma dernière action
   if (me.lastAction) {
     myLastActionEl.textContent = me.lastAction;
     myLastActionEl.classList.remove('hidden');
@@ -272,29 +302,35 @@ function renderBoard() {
   
   if (me.cards) {
     me.cards.forEach(c => {
-      let hidden = (gameMode === 'hotseat' && gameState.players[gameState.activePlayerIndex].id !== myPlayerId);
+      let hidden = (gameMode === 'hotseat' && gameState.players[gameState.activePlayerIndex]?.id !== myPlayerId);
       myCardsEl.appendChild(createCardElement(c, hidden));
     });
   }
 
+  const activeIndex = ['PAUSE', 'END', 'SHOWDOWN'].includes(gameState.stage) ? -1 : gameState.activePlayerIndex;
+
+  if (myIndex === activeIndex) {
+    document.getElementById('my-zone').classList.add('active-turn');
+  } else {
+    document.getElementById('my-zone').classList.remove('active-turn');
+  }
+
+  // Affichage des adversaires
   gameState.players.forEach((p, index) => {
-    if (p.id === myPlayerId) {
-      if (index === gameState.activePlayerIndex) document.getElementById('my-zone').classList.add('active-turn');
-      else document.getElementById('my-zone').classList.remove('active-turn');
-      return;
-    }
+    if (p.id === myPlayerId) return;
 
     const oppDiv = document.createElement('div');
-    oppDiv.className = `player-zone ${p.state === 'FOLDED' ? 'folded' : ''} ${index === gameState.activePlayerIndex ? 'active-turn' : ''}`;
+    oppDiv.className = `player-zone ${p.state === 'FOLDED' ? 'folded' : ''} ${index === activeIndex ? 'active-turn' : ''}`;
     
     const infoDiv = document.createElement('div');
     infoDiv.className = 'player-info';
     
+    const dBadge = index === gameState.dealerIndex ? `<span class="dealer-badge">D</span>` : '';
     const actionBadge = p.lastAction ? `<span class="last-action">${p.lastAction}</span>` : '';
     const reloadBadge = p.reloads > 0 ? `<span class="reload-badge">🔄 ${p.reloads}</span>` : '';
     
     infoDiv.innerHTML = `
-      <span>${p.name} ${reloadBadge}</span> 
+      <span>${p.name} ${dBadge} ${reloadBadge}</span> 
       ${actionBadge}
       <span>${p.chips} €</span>
     `;
@@ -303,7 +339,7 @@ function renderBoard() {
     cardsContainer.className = 'cards-container';
 
     if (p.cards && p.cards.length > 0) {
-      const showCards = (gameState.stage === 'SHOWDOWN') || (gameMode === 'hotseat' && index === gameState.activePlayerIndex);
+      const showCards = (gameState.stage === 'SHOWDOWN' || gameState.stage === 'END') || (gameMode === 'hotseat' && index === gameState.activePlayerIndex);
       p.cards.forEach(c => {
          cardsContainer.appendChild(createCardElement(c, !showCards));
       });
@@ -321,8 +357,28 @@ function renderBoard() {
 
 // --- GESTION DES TOURS ---
 function checkTurnLogic() {
-  const activePlayer = gameState.players[gameState.activePlayerIndex];
+  if (gameState.stage === 'END') {
+      actionButtons.classList.add('hidden');
+      const winner = gameState.players.find(p => p.id === gameState.winnerId);
+      if (winner) elGameMessage.textContent = `${winner.name} remporte la manche !`;
+      
+      if (gameMode !== 'online' || isHost) btnStart.classList.remove('hidden');
+      return;
+  }
   
+  if (gameState.stage === 'PAUSE') {
+      actionButtons.classList.add('hidden');
+      elGameMessage.textContent = activePlayersCount() === 1 ? "Fin de la manche..." : "Distribution...";
+      return;
+  }
+  
+  if (gameState.stage === 'SHOWDOWN') {
+      actionButtons.classList.add('hidden');
+      elGameMessage.textContent = "Abattage des cartes !";
+      return;
+  }
+
+  const activePlayer = gameState.players[gameState.activePlayerIndex];
   elGameMessage.textContent = activePlayer.id === myPlayerId ? "C'est à vous de jouer !" : `Tour de ${activePlayer.name}...`;
 
   if (activePlayer.id === myPlayerId) {
@@ -333,7 +389,7 @@ function checkTurnLogic() {
     }
   } else {
     actionButtons.classList.add('hidden');
-    if (gameMode === 'bot') {
+    if (gameMode === 'bot' && isHost) {
       setTimeout(botPlay, 1500);
     }
   }
@@ -342,13 +398,9 @@ function checkTurnLogic() {
 function botPlay() {
   const bot = gameState.players[gameState.activePlayerIndex];
   if (Math.random() > 0.75 && bot.chips >= 50) {
-    bot.chips -= 50;
-    gameState.pot += 50;
-    bot.lastAction = 'Relance (50)';
-    nextTurn();
+    handleAction('RAISE', 50);
   } else {
-    bot.lastAction = 'Suit';
-    nextTurn();
+    handleAction('CHECK');
   }
 }
 
@@ -392,61 +444,89 @@ function handleAction(action, amount = 0) {
     me.lastAction = 'Suit';
   }
 
+  // On enregistre qu'un joueur de plus a joué
+  gameState.actionsTaken = (gameState.actionsTaken || 0) + 1;
   nextTurn();
 }
 
 function nextTurn() {
+  // On passe au joueur actif suivant
   do {
     gameState.activePlayerIndex = (gameState.activePlayerIndex + 1) % gameState.players.length;
   } while (gameState.players[gameState.activePlayerIndex].state === 'FOLDED' && activePlayersCount() > 1);
 
   if (activePlayersCount() === 1) {
-    endRoundWinner(gameState.players.find(p => p.state === 'ACTIVE'));
+    gameState.stage = 'PAUSE'; 
+    syncState(); 
+    setTimeout(() => {
+      const winner = gameState.players.find(p => p.state === 'ACTIVE');
+      endRoundWinner(winner);
+    }, 2000);
     return;
   }
 
-  if (gameState.activePlayerIndex === 0) {
-    advanceStage();
+  // Vérifie si tout le monde a joué (fin du tour de mise)
+  if (gameState.actionsTaken >= activePlayersCount()) {
+    const next = getNextStage(gameState.stage);
+    
+    if (next === 'SHOWDOWN') {
+        gameState.stage = 'SHOWDOWN';
+        syncState();
+        setTimeout(() => {
+            const winner = gameState.players[0]; // Simplification
+            endRoundWinner(winner);
+        }, 3000);
+    } else {
+        gameState.stage = 'PAUSE';
+        syncState(); 
+        setTimeout(() => {
+            advanceStageActual(next);
+            syncState();
+        }, 2000);
+    }
+  } else {
+    syncState(); 
   }
+}
 
-  syncState();
+function getNextStage(current) {
+  if (current === 'PREFLOP') return 'FLOP';
+  if (current === 'FLOP') return 'TURN';
+  if (current === 'TURN') return 'RIVER';
+  return 'SHOWDOWN';
+}
+
+function advanceStageActual(nextStage) {
+  // Plus de remise à zéro de p.lastAction ici, ça reste affiché !
+  gameState.stage = nextStage;
+  gameState.actionsTaken = 0; // Remise à zéro du compteur d'actions
+  
+  // Le premier à jouer à la prochaine étape est toujours celui après le Dealer
+  gameState.activePlayerIndex = (gameState.dealerIndex + 1) % gameState.players.length;
+  while (gameState.players[gameState.activePlayerIndex].state === 'FOLDED') {
+      gameState.activePlayerIndex = (gameState.activePlayerIndex + 1) % gameState.players.length;
+  }
+  
+  if (nextStage === 'FLOP') {
+    gameState.communityCards.push(gameState.deck.pop(), gameState.deck.pop(), gameState.deck.pop());
+  } else if (nextStage === 'TURN') {
+    gameState.communityCards.push(gameState.deck.pop());
+  } else if (nextStage === 'RIVER') {
+    gameState.communityCards.push(gameState.deck.pop());
+  }
 }
 
 function activePlayersCount() {
   return gameState.players.filter(p => p.state === 'ACTIVE').length;
 }
 
-function advanceStage() {
-  gameState.players.forEach(p => p.lastAction = '');
-
-  if (gameState.stage === 'PREFLOP') {
-    gameState.stage = 'FLOP';
-    gameState.communityCards.push(gameState.deck.pop(), gameState.deck.pop(), gameState.deck.pop());
-  } else if (gameState.stage === 'FLOP') {
-    gameState.stage = 'TURN';
-    gameState.communityCards.push(gameState.deck.pop());
-  } else if (gameState.stage === 'TURN') {
-    gameState.stage = 'RIVER';
-    gameState.communityCards.push(gameState.deck.pop());
-  } else {
-    gameState.stage = 'SHOWDOWN';
-    elGameMessage.textContent = "Abattage des cartes !";
-    setTimeout(() => endRoundWinner(gameState.players[0]), 3000); 
-  }
-}
-
 function endRoundWinner(winner) {
-  elGameMessage.textContent = `${winner.name} remporte le pot de ${gameState.pot}€ !`;
+  gameState.stage = 'END';
+  gameState.winnerId = winner.id;
   winner.chips += gameState.pot;
   gameState.pot = 0;
   
-  actionButtons.classList.add('hidden');
-  
-  if (gameMode !== 'online') {
-    btnStart.classList.remove('hidden');
-  } else if (isHost) {
-    btnStart.classList.remove('hidden');
-  }
+  syncState();
 }
 
 function syncState() {
@@ -456,10 +536,14 @@ function syncState() {
 
     updates['rooms/' + roomCode + '/players'] = gameState.players.reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
     updates['rooms/' + roomCode + '/gameState'] = { 
-       pot: gameState.pot, stage: gameState.stage, 
+       pot: gameState.pot, 
+       stage: gameState.stage, 
        activePlayerIndex: gameState.activePlayerIndex, 
+       dealerIndex: gameState.dealerIndex,
+       actionsTaken: gameState.actionsTaken,
        deck: gameState.deck || [], 
-       communityCards: gameState.communityCards || [] 
+       communityCards: gameState.communityCards || [],
+       winnerId: gameState.winnerId || null
     };
     
     update(ref(window.db), updates);
