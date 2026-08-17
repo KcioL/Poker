@@ -168,13 +168,20 @@ function createDeck() {
 function createCardElement(card, hidden = false) {
   const cardEl = document.createElement('div');
   cardEl.classList.add('card', 'deal-animation');
-  if (!hidden) cardEl.classList.add('flipped');
   
   cardEl.innerHTML = `
     <div class="card-face card-back"></div>
     <div class="card-face card-front ${card.isRed ? 'red' : ''}">
       <div>${card.value}</div><div class="card-center">${card.suit}</div><div style="text-align: right;">${card.value}</div>
     </div>`;
+    
+  // On force le retournement avec un micro-délai pour déclencher l'animation 3D
+  if (!hidden) {
+    setTimeout(() => {
+      cardEl.classList.add('flipped');
+    }, 50);
+  }
+  
   return cardEl;
 }
 
