@@ -47,13 +47,11 @@
       <div class="pot-display">Pot : <span id="pot-amount">0</span> €</div>
     </header>
 
-    <!-- Menu Multijoueur (Caché par défaut) -->
+    <!-- Menu Multijoueur -->
     <div id="online-lobby" class="lobby-container hidden">
-      
-      <!-- Champ pour le pseudo -->
       <div class="name-box" style="text-align: center; margin-bottom: 10px;">
         <label for="player-name-input" style="font-weight: bold; margin-right: 10px;">Ton pseudo :</label>
-        <input type="text" id="player-name-input" placeholder="Ex: Loïck" style="padding: 6px; border-radius: 6px; border: 1px solid #555; background: #2a2a2a; color: white; text-align: center;">
+        <input type="text" id="player-name-input" placeholder="Ex: Johnny Sins" style="padding: 6px; border-radius: 6px; border: 1px solid #555; background: #2a2a2a; color: white; text-align: center;">
       </div>
 
       <div class="create-room-box">
@@ -78,7 +76,7 @@
     </div>
 
     <div class="poker-table">
-      <!-- Zone des adversaires (Générée dynamiquement) -->
+      <!-- Zone des adversaires -->
       <div id="opponents-zone" class="opponents-container"></div>
 
       <!-- Zone Commune -->
@@ -87,11 +85,12 @@
         <div class="game-message" id="game-message">Choisis un mode et clique sur "Nouvelle Main".</div>
       </div>
 
-      <!-- Zone Mon Joueur (ou Joueur 1 en local) -->
+      <!-- Zone Mon Joueur -->
       <div id="my-zone" class="player-zone p1-zone">
         <div class="cards-container" id="my-cards"></div>
         <div class="player-info">
           <span class="player-name" id="my-name">Joueur 1</span>
+          <span id="my-last-action" class="last-action hidden"></span>
           <span class="player-chips"><span id="my-chips">1000</span> €</span>
         </div>
       </div>
@@ -108,7 +107,7 @@
     </div>
   </div>
 
-  <!-- Écran d'attente passe-et-joue -->
+  <!-- Écran passe-et-joue (Hotseat) -->
   <div id="pass-overlay" class="overlay hidden">
     <div class="overlay-card">
       <h2 id="overlay-title">Au tour de...</h2>
