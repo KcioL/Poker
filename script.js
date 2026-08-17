@@ -1,10 +1,11 @@
-// --- CONSTANTES & VARIABLES GLOBALES ---
+// CONSTANTES & VARIABLES GLOBALES
 const SUITS = ['♠', '♥', '♦', '♣'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 
 let gameState = {
   status: 'IDLE',
   pot: 0,
+  currentBet: 0, // Retient la mise la plus haute en cours
   deck: [],
   communityCards: [],
   stage: 'START', 
@@ -20,7 +21,7 @@ let myPlayerId = 'p1';
 let isHost = true; 
 let roomCode = null;
 
-// --- ÉLÉMENTS DOM ---
+// ÉLÉMENTS DOM
 const selectMode = document.getElementById('select-mode');
 const onlineLobby = document.getElementById('online-lobby');
 const playerNameInput = document.getElementById('player-name-input');
@@ -51,7 +52,7 @@ const passOverlay = document.getElementById('pass-overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const btnReady = document.getElementById('btn-ready');
 
-// --- CHANGEMENT DE MODE ---
+// CHANGEMENT DE MODE 
 selectMode.addEventListener('change', (e) => {
   gameMode = e.target.value;
   if (gameMode === 'online') {
@@ -63,7 +64,7 @@ selectMode.addEventListener('change', (e) => {
   }
 });
 
-// --- RECAVE (REFILL) LOGIC ---
+// RECAVE (REFILL) LOGIC
 btnRefill.addEventListener('click', () => {
   const me = gameState.players.find(p => p.id === myPlayerId);
   if (me) {
@@ -73,7 +74,7 @@ btnRefill.addEventListener('click', () => {
   }
 });
 
-// --- LOBBY ONLINE LOGIC ---
+// LOBBY ONLINE LOGIC
 btnCreateRoom.addEventListener('click', () => {
   const maxP = parseInt(document.getElementById('player-count').value);
   const myName = playerNameInput.value.trim() || "Johnny Sins";
@@ -87,8 +88,8 @@ btnCreateRoom.addEventListener('click', () => {
   set(ref(window.db, 'rooms/' + roomCode), {
     maxPlayers: maxP,
     status: 'WAITING',
-    players: { p1: { id: 'p1', name: myName, chips: 1000, cards: [], state: 'ACTIVE', lastAction: '', reloads: 0 } },
-    gameState: { pot: 0, stage: 'START', activePlayerIndex: 0, dealerIndex: 0, actionsTaken: 0, winnerId: null }
+    players: { p1: { id: 'p1', name: myName, chips: 1000, cards: [], state: 'ACTIVE', lastAction: '', reloads: 0, currentBet: 0 } },
+    gameState: { pot: 0, currentBet: 0, stage: 'START', activePlayerIndex: 0, dealerIndex: 0, actionsTaken: 0, winnerId: null }
   }).then(() => {
     listenToRoom();
   });
@@ -113,7 +114,7 @@ btnJoinRoom.addEventListener('click', () => {
           
           const updates = {};
           updates['rooms/' + roomCode + '/players/' + myPlayerId] = {
-            id: myPlayerId, name: myName, chips: 1000, cards: [], state: 'ACTIVE', lastAction: '', reloads: 0
+            id: myPlayerId, name: myName, chips: 1000, cards: [], state: 'ACTIVE', lastAction: '', reloads: 0, currentBet: 0
           };
           update(ref(window.db), updates).then(() => {
             listenToRoom();
@@ -146,6 +147,7 @@ function listenToRoom() {
       onlineLobby.classList.add('hidden');
       gameState.players = playersArr;
       gameState.pot = data.gameState.pot || 0;
+      gameState.currentBet = data.gameState.currentBet || 0;
       gameState.communityCards = data.gameState.communityCards || [];
       gameState.stage = data.gameState.stage || 'START';
       gameState.activePlayerIndex = data.gameState.activePlayerIndex || 0;
@@ -167,6 +169,7 @@ function initOnlineHand(playersArr, dealerIdx) {
     p.state = 'ACTIVE';
     p.lastAction = ''; 
     p.reloads = p.reloads || 0;
+    p.currentBet = 15; // Chaque joueur paie la petite blinde
     p.cards = [deck.pop(), deck.pop()];
   });
   
@@ -177,6 +180,7 @@ function initOnlineHand(playersArr, dealerIdx) {
     'players': playersArr.reduce((acc, p) => ({ ...acc, [p.id]: p }), {}),
     'gameState': { 
         pot: playersArr.length * 15, 
+        currentBet: 15, // La blinde fixe la première mise à 15
         stage: 'PREFLOP', 
         activePlayerIndex: firstActor, 
         dealerIndex: dealerIdx,
@@ -188,7 +192,7 @@ function initOnlineHand(playersArr, dealerIdx) {
   });
 }
 
-// --- LOGIQUE DU JEU (LOCAL & ONLINE) ---
+// LOGIQUE DU JEU (LOCAL & ONLINE)
 function createDeck() {
   let d = [];
   for (let suit of SUITS) {
@@ -232,8 +236,8 @@ btnStart.addEventListener('click', () => {
     let nextDealer = gameState.dealerIndex !== undefined ? (gameState.dealerIndex + 1) % 2 : 0;
 
     gameState.players = [
-      { id: 'p1', name: 'Joueur 1', chips: p1Chips, cards: [], state: 'ACTIVE', lastAction: '', reloads: p1Reloads },
-      { id: 'p2', name: gameMode === 'bot' ? 'Bot AI' : 'Joueur 2', chips: p2Chips, cards: [], state: 'ACTIVE', lastAction: '', reloads: p2Reloads }
+      { id: 'p1', name: 'Joueur 1', chips: p1Chips, cards: [], state: 'ACTIVE', lastAction: '', reloads: p1Reloads, currentBet: 0 },
+      { id: 'p2', name: gameMode === 'bot' ? 'Bot AI' : 'Joueur 2', chips: p2Chips, cards: [], state: 'ACTIVE', lastAction: '', reloads: p2Reloads, currentBet: 0 }
     ];
     gameState.dealerIndex = nextDealer;
     myPlayerId = 'p1';
@@ -245,6 +249,7 @@ btnStart.addEventListener('click', () => {
 function startHandLocally() {
   gameState.deck = createDeck();
   gameState.pot = 0;
+  gameState.currentBet = 15;
   gameState.communityCards = [];
   gameState.stage = 'PREFLOP';
   gameState.activePlayerIndex = (gameState.dealerIndex + 1) % gameState.players.length;
@@ -256,6 +261,7 @@ function startHandLocally() {
     gameState.pot += 15;
     p.state = 'ACTIVE';
     p.lastAction = '';
+    p.currentBet = 15;
     p.cards = [gameState.deck.pop(), gameState.deck.pop()];
   });
 
@@ -264,7 +270,7 @@ function startHandLocally() {
   checkTurnLogic();
 }
 
-// --- AFFICHAGE GRAPHIQUE ---
+// AFFICHAGE GRAPHIQUE
 function renderBoard() {
   elPot.textContent = gameState.pot;
   opponentsZone.innerHTML = '';
@@ -377,6 +383,13 @@ function checkTurnLogic() {
     if (gameMode === 'hotseat' && myCardsEl.innerHTML === '') {
        promptHotseatSwap(activePlayer.name);
     } else {
+       // Modification dynamique du bouton Suivre/Check 
+       let callAmount = (gameState.currentBet || 0) - (activePlayer.currentBet || 0);
+       if (callAmount > 0) {
+         btnCheck.textContent = `Suivre (${callAmount}€)`;
+       } else {
+         btnCheck.textContent = "Check (Parole)";
+       }
        actionButtons.classList.remove('hidden');
     }
   } else {
@@ -389,7 +402,9 @@ function checkTurnLogic() {
 
 function botPlay() {
   const bot = gameState.players[gameState.activePlayerIndex];
-  if (Math.random() > 0.75 && bot.chips >= 50) {
+  let callAmount = (gameState.currentBet || 0) - (bot.currentBet || 0);
+  
+  if (Math.random() > 0.75 && bot.chips >= callAmount + 50) {
     handleAction('RAISE', 50);
   } else {
     handleAction('CHECK');
@@ -409,12 +424,19 @@ btnAllIn.addEventListener('click', () => handleAction('ALL_IN'));
 
 function handleAction(action, amount = 0) {
   const me = gameState.players[gameState.activePlayerIndex];
+  let callAmount = (gameState.currentBet || 0) - (me.currentBet || 0);
   
   if (action === 'RAISE') {
-    if (me.chips >= amount) {
-      me.chips -= amount;
-      gameState.pot += amount;
-      me.lastAction = `Relance (${amount})`;
+    let totalToPay = callAmount + amount; // Il paie la différence + la relance
+    if (me.chips >= totalToPay) {
+      me.chips -= totalToPay;
+      gameState.pot += totalToPay;
+      gameState.currentBet = (gameState.currentBet || 0) + amount;
+      me.currentBet = gameState.currentBet;
+      me.lastAction = `Relance (+${amount})`;
+      
+      // La relance remet le compteur d'action à 1, obligeant les autres à jouer
+      gameState.actionsTaken = 1; 
     } else {
       alert("Jetons insuffisants !");
       return;
@@ -424,7 +446,15 @@ function handleAction(action, amount = 0) {
       const allInAmount = me.chips;
       gameState.pot += allInAmount;
       me.chips = 0;
+      me.currentBet = (me.currentBet || 0) + allInAmount;
       me.lastAction = `Tapis ! (${allInAmount})`;
+
+      if (me.currentBet > gameState.currentBet) {
+        gameState.currentBet = me.currentBet; // S'il relance avec son tapis
+        gameState.actionsTaken = 1; 
+      } else {
+        gameState.actionsTaken = (gameState.actionsTaken || 0) + 1;
+      }
     } else {
       alert("Tu n'as plus de jetons !");
       return;
@@ -432,11 +462,27 @@ function handleAction(action, amount = 0) {
   } else if (action === 'FOLD') {
     me.state = 'FOLDED';
     me.lastAction = 'Se couche';
+    gameState.actionsTaken = (gameState.actionsTaken || 0) + 1;
   } else if (action === 'CHECK') {
-    me.lastAction = 'Suit';
+    if (callAmount > 0) {
+      if (me.chips >= callAmount) {
+        me.chips -= callAmount;
+        gameState.pot += callAmount;
+        me.currentBet = gameState.currentBet;
+        me.lastAction = 'Suit';
+      } else {
+        // Tapis forcé s'il n'a pas assez pour suivre
+        gameState.pot += me.chips;
+        me.currentBet += me.chips;
+        me.chips = 0;
+        me.lastAction = 'Tapis ! (Suit)';
+      }
+    } else {
+      me.lastAction = 'Check';
+    }
+    gameState.actionsTaken = (gameState.actionsTaken || 0) + 1;
   }
 
-  gameState.actionsTaken = (gameState.actionsTaken || 0) + 1;
   nextTurn();
 }
 
@@ -455,13 +501,14 @@ function nextTurn() {
     return;
   }
 
+  // Le tour se termine quand tout le monde a pris une décision par rapport à la dernière mise
   if (gameState.actionsTaken >= activePlayersCount()) {
     const next = getNextStage(gameState.stage);
     
     if (next === 'SHOWDOWN') {
         gameState.stage = 'SHOWDOWN';
         
-        // --- EVALUATION DES MAINS ---
+        //EVALUATION DES MAINS
         let bestScore = -1;
         let winner = null;
         
@@ -505,6 +552,9 @@ function getNextStage(current) {
 function advanceStageActual(nextStage) {
   gameState.stage = nextStage;
   gameState.actionsTaken = 0; 
+  gameState.currentBet = 0; // Remise à 0 de la mise du nouveau tour
+  
+  gameState.players.forEach(p => p.currentBet = 0); // Remise à 0 de l'engagement
   
   gameState.activePlayerIndex = (gameState.dealerIndex + 1) % gameState.players.length;
   while (gameState.players[gameState.activePlayerIndex].state === 'FOLDED') {
@@ -520,7 +570,7 @@ function advanceStageActual(nextStage) {
   }
 }
 
-// --- ALGORITHME DE POKER ---
+// ALGORITHME DE POKER 
 function getBestHand(playerCards, communityCards) {
   const allCards = [...playerCards, ...communityCards];
   if (allCards.length < 5) return { name: "Carte Haute", score: 0 };
@@ -595,9 +645,6 @@ function activePlayersCount() {
 }
 
 function endRoundWinner(winner) {
-  // CORRECTION DU BUG DE LA CAGNOTTE :
-  // On récupère le gagnant en cherchant son ID dans la liste actuelle des joueurs.
-  // Cela empêche Firebase de cibler une ancienne version du joueur et de faire disparaître l'argent !
   const realWinner = gameState.players.find(p => p.id === winner.id);
   
   if (realWinner) {
@@ -617,7 +664,8 @@ function syncState() {
 
     updates['rooms/' + roomCode + '/players'] = gameState.players.reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
     updates['rooms/' + roomCode + '/gameState'] = { 
-       pot: gameState.pot, 
+       pot: gameState.pot,
+       currentBet: gameState.currentBet,
        stage: gameState.stage, 
        activePlayerIndex: gameState.activePlayerIndex, 
        dealerIndex: gameState.dealerIndex,
