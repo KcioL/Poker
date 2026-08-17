@@ -24,7 +24,6 @@ body {
   gap: 15px;
 }
 
-/* En-tête (Header) */
 .game-header {
   display: flex;
   justify-content: space-between;
@@ -34,148 +33,88 @@ body {
   gap: 10px;
 }
 
-.mode-select label { 
-  margin-right: 8px; 
-  font-weight: bold; 
-}
-
+.mode-select label { margin-right: 8px; font-weight: bold; }
 .mode-select select {
-  padding: 6px 12px;
-  border-radius: 6px;
-  background: #2a2a2a;
-  color: #fff;
-  border: 1px solid #444;
-  font-size: 0.9rem;
-  cursor: pointer;
+  padding: 6px 12px; border-radius: 6px; background: #2a2a2a; color: #fff;
+  border: 1px solid #444; font-size: 0.9rem; cursor: pointer;
 }
 
 .pot-display {
-  font-size: 1.3rem;
-  font-weight: bold;
-  background-color: #1e1e1e;
-  padding: 8px 18px;
-  border-radius: 20px;
-  border: 2px solid #ffd700;
-  color: #ffd700;
+  font-size: 1.3rem; font-weight: bold; background-color: #1e1e1e;
+  padding: 8px 18px; border-radius: 20px; border: 2px solid #ffd700; color: #ffd700;
 }
 
-/* LOBBY ONLINE (Salle d'attente) */
 .lobby-container {
-  background: #1e1e1e;
-  padding: 20px;
-  border-radius: 10px;
-  border: 1px solid #444;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
+  background: #1e1e1e; padding: 20px; border-radius: 10px; border: 1px solid #444;
+  width: 100%; display: flex; flex-direction: column; gap: 15px;
 }
 
 .name-box, .create-room-box, .join-room-box {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  justify-content: center;
-  flex-wrap: wrap;
+  display: flex; align-items: center; gap: 10px; justify-content: center; flex-wrap: wrap;
 }
 
 .lobby-container input, .lobby-container select {
-  padding: 8px;
-  border-radius: 5px;
-  border: 1px solid #555;
-  background: #2a2a2a;
-  color: white;
-  text-align: center;
+  padding: 8px; border-radius: 5px; border: 1px solid #555; background: #2a2a2a; color: white; text-align: center;
 }
 
-/* Tapis de poker */
 .poker-table {
-  width: 100%;
-  height: 520px;
-  background: radial-gradient(circle, #1b6336 0%, #0d381e 100%);
-  border: 12px solid #5c3a21;
-  border-radius: 120px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 20px;
-  position: relative;
+  width: 100%; height: 520px; background: radial-gradient(circle, #1b6336 0%, #0d381e 100%);
+  border: 12px solid #5c3a21; border-radius: 120px; display: flex; flex-direction: column;
+  justify-content: space-between; padding: 20px; position: relative;
   box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.7);
 }
 
-/* Conteneur des adversaires */
 .opponents-container {
-  display: flex;
-  justify-content: space-around;
-  width: 100%;
-  flex-wrap: wrap;
-  gap: 10px;
+  display: flex; justify-content: space-around; width: 100%; flex-wrap: wrap; gap: 10px;
 }
 
 .player-zone {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
 }
 
 .player-info {
-  background: rgba(0, 0, 0, 0.6);
-  padding: 4px 12px;
-  border-radius: 8px;
-  display: flex;
-  gap: 10px;
-  font-weight: bold;
-  font-size: 0.9rem;
-  transition: all 0.3s ease;
+  background: rgba(0, 0, 0, 0.6); padding: 4px 12px; border-radius: 8px;
+  display: flex; gap: 10px; font-weight: bold; font-size: 0.9rem; transition: all 0.3s ease;
 }
 
-/* Effets visuels pour les tours */
 .active-turn .player-info {
-  border: 2px solid #ffd700;
-  background: rgba(255, 215, 0, 0.2);
-  box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+  border: 2px solid #ffd700; background: rgba(255, 215, 0, 0.2); box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
 }
 
-.folded { 
-  opacity: 0.5; 
-}
+.folded { opacity: 0.5; }
 
 .community-zone {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
 
 .game-message {
-  font-size: 0.95rem;
-  background: rgba(0, 0, 0, 0.75);
-  padding: 6px 16px;
-  border-radius: 8px;
-  color: #e0e0e0;
+  font-size: 0.95rem; background: rgba(0, 0, 0, 0.75); padding: 6px 16px;
+  border-radius: 8px; color: #e0e0e0;
 }
 
-/* Cartes et animations 3D */
+/* CARTES ET ANIMATIONS (CORRIGÉES) */
 .cards-container, .community-cards {
-  display: flex;
-  gap: 5px;
-  min-height: 80px;
-  perspective: 1000px;
+  display: flex; gap: 5px; min-height: 80px; perspective: 1000px;
 }
 
 .card {
-  width: 55px;
-  height: 80px;
-  position: relative;
-  transform-style: preserve-3d;
-  transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
-  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.4);
-  border-radius: 6px;
+  width: 55px; height: 80px; position: relative; transform-style: preserve-3d;
+  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.4); border-radius: 6px;
 }
 
+/* Animation carte face cachée */
 .card.deal-animation { 
   animation: deal 0.5s ease-out forwards; 
+}
+
+/* Animation carte face visible (C'est ceci qui manquait !) */
+.card.deal-animation.flipped { 
+  animation: deal-flipped 0.5s ease-out forwards; 
+}
+
+/* Retournement simple sans distribution */
+.card.flipped:not(.deal-animation) {
+  transform: rotateY(180deg);
 }
 
 @keyframes deal {
@@ -183,65 +122,32 @@ body {
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.card.flipped { 
-  transform: rotateY(180deg); 
+@keyframes deal-flipped {
+  0% { opacity: 0; transform: translateY(-50px) scale(0.5) rotateY(180deg); }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotateY(180deg); }
 }
 
 .card-face {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  backface-visibility: hidden;
-  border-radius: 6px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 4px;
-  font-weight: bold;
-  font-size: 0.9rem;
+  position: absolute; width: 100%; height: 100%; backface-visibility: hidden;
+  border-radius: 6px; display: flex; flex-direction: column; justify-content: space-between;
+  padding: 4px; font-weight: bold; font-size: 0.9rem;
 }
 
-.card-front { 
-  background-color: #ffffff; 
-  color: #000000; 
-  transform: rotateY(180deg); 
-}
-
-.card-front.red { 
-  color: #d9534f; 
-}
-
+.card-front { background-color: #ffffff; color: #000000; transform: rotateY(180deg); }
+.card-front.red { color: #d9534f; }
 .card-back {
-  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-  border: 2px solid #ffffff;
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border: 2px solid #ffffff;
 }
 
-.card-center { 
-  align-self: center; 
-  font-size: 1.2rem; 
-}
+.card-center { align-self: center; font-size: 1.2rem; }
 
-/* Boutons d'action */
-.controls, .action-buttons { 
-  display: flex; 
-  gap: 12px; 
-  flex-wrap: wrap; 
-  justify-content: center; 
-}
-
-.hidden { 
-  display: none !important; 
-}
+.controls, .action-buttons { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.hidden { display: none !important; }
 
 .btn {
-  padding: 10px 16px;
-  border: none;
-  border-radius: 8px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: transform 0.1s, opacity 0.2s;
+  padding: 10px 16px; border: none; border-radius: 8px; font-weight: bold;
+  cursor: pointer; transition: transform 0.1s, opacity 0.2s;
 }
-
 .btn:hover { transform: translateY(-2px); }
 .btn:active { transform: translateY(0); }
 
@@ -250,25 +156,11 @@ body {
 .btn-secondary { background-color: #3498db; color: #fff; }
 .btn-success { background-color: #2ecc71; color: #fff; }
 
-/* Écran superposé (Overlay) pour le mode "Hotseat" ou messages importants */
 .overlay {
-  position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0, 0, 0, 0.9);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 100;
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9);
+  display: flex; justify-content: center; align-items: center; z-index: 100;
 }
-
 .overlay-card {
-  background: #1e1e1e;
-  padding: 30px;
-  border-radius: 16px;
-  border: 2px solid #ffd700;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 400px;
+  background: #1e1e1e; padding: 30px; border-radius: 16px; border: 2px solid #ffd700;
+  text-align: center; display: flex; flex-direction: column; gap: 20px; max-width: 400px;
 }
