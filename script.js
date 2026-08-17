@@ -165,22 +165,31 @@ function createDeck() {
   return d.sort(() => Math.random() - 0.5);
 }
 
+// CRÉATION DE CARTE AVEC STRUCTURE SÉPARÉE
 function createCardElement(card, hidden = false) {
-  const cardEl = document.createElement('div');
-  cardEl.className = 'card deal-animation';
+  // Le wrapper gère l'animation de base
+  const wrapper = document.createElement('div');
+  wrapper.className = 'card-wrapper deal-animation';
   
-  // On applique la classe 'flipped' de manière synchrone
-  if (!hidden) {
-    cardEl.classList.add('flipped');
-  }
-
+  // La carte gère la 3D
+  const cardEl = document.createElement('div');
+  cardEl.className = 'card';
+  
   cardEl.innerHTML = `
     <div class="card-face card-back"></div>
     <div class="card-face card-front ${card.isRed ? 'red' : ''}">
       <div>${card.value}</div><div class="card-center">${card.suit}</div><div style="text-align: right;">${card.value}</div>
     </div>`;
-
-  return cardEl;
+    
+  // Un léger délai pour être sûr que l'animation de retournement se lance
+  if (!hidden) {
+    setTimeout(() => {
+      cardEl.classList.add('flipped');
+    }, 100);
+  }
+  
+  wrapper.appendChild(cardEl);
+  return wrapper;
 }
 
 btnStart.addEventListener('click', () => {
@@ -230,7 +239,6 @@ function renderBoard() {
   myNameEl.textContent = me.name;
   myChipsEl.textContent = me.chips;
   
-  // Affichage de ma dernière action
   if (me.lastAction) {
     myLastActionEl.textContent = me.lastAction;
     myLastActionEl.classList.remove('hidden');
@@ -245,7 +253,6 @@ function renderBoard() {
     });
   }
 
-  // Construction des adversaires en évitant .outerHTML pour préserver le DOM
   gameState.players.forEach((p, index) => {
     if (p.id === myPlayerId) {
       if (index === gameState.activePlayerIndex) document.getElementById('my-zone').classList.add('active-turn');
@@ -280,7 +287,6 @@ function renderBoard() {
     opponentsZone.appendChild(oppDiv);
   });
 
-  // Construction des cartes communes
   gameState.communityCards.forEach(c => {
     elCommunityCards.appendChild(createCardElement(c, false));
   });
@@ -307,7 +313,6 @@ function checkTurnLogic() {
 }
 
 function botPlay() {
-  // L'IA décide de relancer dans 25% des cas
   if (Math.random() > 0.75 && gameState.players[1].chips >= 50) {
     handleAction('RAISE');
   } else {
@@ -347,7 +352,6 @@ function nextTurn() {
     return;
   }
 
-  // Si on a fait le tour complet de la table
   if (gameState.activePlayerIndex === 0) {
     advanceStage();
   }
@@ -360,7 +364,6 @@ function activePlayersCount() {
 }
 
 function advanceStage() {
-  // Nettoyer les actions précédentes car c'est un nouveau tour de mise
   gameState.players.forEach(p => p.lastAction = '');
 
   if (gameState.stage === 'PREFLOP') {
@@ -413,7 +416,6 @@ function syncState() {
   }
 }
 
-// --- HOTSEAT OVERLAY ---
 function promptHotseatSwap(name) {
   document.getElementById('my-zone').classList.remove('active-turn');
   myCardsEl.innerHTML = '';
