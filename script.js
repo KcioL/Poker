@@ -7,7 +7,7 @@ let gameState = {
   pot: 0,
   deck: [],
   communityCards: [],
-  stage: 'START', // PREFLOP, FLOP, TURN, RIVER, SHOWDOWN
+  stage: 'START',
   activePlayerIndex: 0,
   players: []
 };
@@ -28,6 +28,7 @@ const lobbyStatus = document.getElementById('lobby-status');
 const opponentsZone = document.getElementById('opponents-zone');
 const myCardsEl = document.getElementById('my-cards');
 const myNameEl = document.getElementById('my-name');
+const myLastActionEl = document.getElementById('my-last-action');
 const myChipsEl = document.getElementById('my-chips');
 const elCommunityCards = document.getElementById('community-cards');
 const elPot = document.getElementById('pot-amount');
@@ -58,7 +59,7 @@ selectMode.addEventListener('change', (e) => {
 // --- LOBBY ONLINE LOGIC ---
 btnCreateRoom.addEventListener('click', () => {
   const maxP = parseInt(document.getElementById('player-count').value);
-  const myName = playerNameInput.value.trim() || "Joueur 1";
+  const myName = playerNameInput.value.trim() || "Johnny Sins";
   roomCode = Math.floor(1000 + Math.random() * 9000).toString();
   
   isHost = true;
@@ -69,7 +70,7 @@ btnCreateRoom.addEventListener('click', () => {
   set(ref(window.db, 'rooms/' + roomCode), {
     maxPlayers: maxP,
     status: 'WAITING',
-    players: { p1: { id: 'p1', name: myName, chips: 1000, cards: [], state: 'ACTIVE' } },
+    players: { p1: { id: 'p1', name: myName, chips: 1000, cards: [], state: 'ACTIVE', lastAction: '' } },
     gameState: { pot: 0, stage: 'START', activePlayerIndex: 0 }
   }).then(() => {
     listenToRoom();
@@ -95,7 +96,7 @@ btnJoinRoom.addEventListener('click', () => {
           
           const updates = {};
           updates['rooms/' + roomCode + '/players/' + myPlayerId] = {
-            id: myPlayerId, name: myName, chips: 1000, cards: [], state: 'ACTIVE'
+            id: myPlayerId, name: myName, chips: 1000, cards: [], state: 'ACTIVE', lastAction: ''
           };
           update(ref(window.db), updates).then(() => {
             listenToRoom();
@@ -144,6 +145,7 @@ function initOnlineHand(playersArr) {
   playersArr.forEach(p => {
     p.chips -= 15; 
     p.state = 'ACTIVE';
+    p.lastAction = '';
     p.cards = [deck.pop(), deck.pop()];
   });
   
@@ -166,7 +168,6 @@ function createDeck() {
 function createCardElement(card, hidden = false) {
   const cardEl = document.createElement('div');
   cardEl.classList.add('card', 'deal-animation');
-  // L'ajout du hidden = false déclenche la nouvelle animation deal-flipped
   if (!hidden) cardEl.classList.add('flipped');
   
   cardEl.innerHTML = `
@@ -177,18 +178,16 @@ function createCardElement(card, hidden = false) {
   return cardEl;
 }
 
-// Le bouton gère maintenant le lancement Local ET les relances En Ligne
 btnStart.addEventListener('click', () => {
   if (gameMode === 'online' && isHost) {
     initOnlineHand(gameState.players);
   } else {
-    // Mode Local: On garde les jetons de la manche précédente si on relance
     let p1Chips = gameState.players[0] ? gameState.players[0].chips : 1000;
     let p2Chips = gameState.players[1] ? gameState.players[1].chips : 1000;
 
     gameState.players = [
-      { id: 'p1', name: 'Joueur 1', chips: p1Chips, cards: [], state: 'ACTIVE' },
-      { id: 'p2', name: gameMode === 'bot' ? 'Bot AI' : 'Joueur 2', chips: p2Chips, cards: [], state: 'ACTIVE' }
+      { id: 'p1', name: 'Joueur 1', chips: p1Chips, cards: [], state: 'ACTIVE', lastAction: '' },
+      { id: 'p2', name: gameMode === 'bot' ? 'Bot AI' : 'Joueur 2', chips: p2Chips, cards: [], state: 'ACTIVE', lastAction: '' }
     ];
     myPlayerId = 'p1';
     startHandLocally();
@@ -206,6 +205,7 @@ function startHandLocally() {
     p.chips -= 15;
     gameState.pot += 15;
     p.state = 'ACTIVE';
+    p.lastAction = '';
     p.cards = [gameState.deck.pop(), gameState.deck.pop()];
   });
 
@@ -224,6 +224,14 @@ function renderBoard() {
   const me = gameState.players.find(p => p.id === myPlayerId);
   myNameEl.textContent = me.name;
   myChipsEl.textContent = me.chips;
+  
+  // Affichage de ma dernière action
+  if (me.lastAction) {
+    myLastActionEl.textContent = me.lastAction;
+    myLastActionEl.classList.remove('hidden');
+  } else {
+    myLastActionEl.classList.add('hidden');
+  }
   
   if (me.cards) {
     me.cards.forEach(c => {
@@ -246,13 +254,19 @@ function renderBoard() {
     if (p.cards && p.cards.length > 0) {
       const showCards = (gameState.stage === 'SHOWDOWN') || (gameMode === 'hotseat' && index === gameState.activePlayerIndex);
       p.cards.forEach(c => {
-         const cardDOM = createCardElement(c, !showCards);
-         cardsHTML += cardDOM.outerHTML;
+         cardsHTML += createCardElement(c, !showCards).outerHTML;
       });
     }
 
+    // Ajout du badge d'action pour les adversaires
+    const actionBadge = p.lastAction ? `<span class="last-action">${p.lastAction}</span>` : '';
+
     oppDiv.innerHTML = `
-      <div class="player-info"><span>${p.name}</span> <span>${p.chips} €</span></div>
+      <div class="player-info">
+        <span>${p.name}</span> 
+        ${actionBadge}
+        <span>${p.chips} €</span>
+      </div>
       <div class="cards-container">${cardsHTML}</div>
     `;
     opponentsZone.appendChild(oppDiv);
@@ -284,7 +298,12 @@ function checkTurnLogic() {
 }
 
 function botPlay() {
-  handleAction('CHECK');
+  // L'IA décide de relancer dans 25% des cas si elle a assez de jetons
+  if (Math.random() > 0.75 && gameState.players[1].chips >= 50) {
+    handleAction('RAISE');
+  } else {
+    handleAction('CHECK');
+  }
 }
 
 // --- ACTIONS JOUEURS ---
@@ -298,8 +317,12 @@ function handleAction(action) {
   if (action === 'RAISE' && me.chips >= 50) {
     me.chips -= 50;
     gameState.pot += 50;
+    me.lastAction = 'Relance (+50)';
   } else if (action === 'FOLD') {
     me.state = 'FOLDED';
+    me.lastAction = 'Se couche';
+  } else if (action === 'CHECK') {
+    me.lastAction = 'Suit';
   }
 
   nextTurn();
@@ -315,7 +338,7 @@ function nextTurn() {
     return;
   }
 
-  // Dès qu'on revient au premier joueur, on avance l'étape du jeu (Flop, Turn...)
+  // Si on a fait le tour complet de la table
   if (gameState.activePlayerIndex === 0) {
     advanceStage();
   }
@@ -328,6 +351,9 @@ function activePlayersCount() {
 }
 
 function advanceStage() {
+  // Nettoyer les actions précédentes car c'est un nouveau tour de mise
+  gameState.players.forEach(p => p.lastAction = '');
+
   if (gameState.stage === 'PREFLOP') {
     gameState.stage = 'FLOP';
     gameState.communityCards.push(gameState.deck.pop(), gameState.deck.pop(), gameState.deck.pop());
@@ -340,7 +366,7 @@ function advanceStage() {
   } else {
     gameState.stage = 'SHOWDOWN';
     elGameMessage.textContent = "Abattage des cartes !";
-    setTimeout(() => endRoundWinner(gameState.players[0]), 3000); // Simplification: le P1 gagne tout à la fin
+    setTimeout(() => endRoundWinner(gameState.players[0]), 3000); 
   }
 }
 
@@ -354,7 +380,7 @@ function endRoundWinner(winner) {
   if (gameMode !== 'online') {
     btnStart.classList.remove('hidden');
   } else if (isHost) {
-    btnStart.classList.remove('hidden'); // Seul l'hôte relance
+    btnStart.classList.remove('hidden');
   }
 }
 
@@ -363,7 +389,6 @@ function syncState() {
     const { ref, update } = window.firebaseRefs;
     const updates = {};
 
-    // Pousser l'état global du jeu pour éviter les désynchronisations de Deck ou de Cartes Communes
     updates['rooms/' + roomCode + '/players'] = gameState.players.reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
     updates['rooms/' + roomCode + '/gameState'] = { 
        pot: gameState.pot, stage: gameState.stage, 
