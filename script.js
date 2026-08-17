@@ -165,11 +165,11 @@ function listenToRoom() {
 function initOnlineHand(playersArr, dealerIdx) {
   const deck = createDeck();
   playersArr.forEach(p => {
-    p.chips -= 15; 
+    p.chips -= 10; 
     p.state = 'ACTIVE';
     p.lastAction = ''; 
     p.reloads = p.reloads || 0;
-    p.currentBet = 15; // Chaque joueur paie la petite blinde
+    p.currentBet = 10; // Chaque joueur paie la petite blinde
     p.cards = [deck.pop(), deck.pop()];
   });
   
@@ -179,8 +179,8 @@ function initOnlineHand(playersArr, dealerIdx) {
   update(ref(window.db, 'rooms/' + roomCode), {
     'players': playersArr.reduce((acc, p) => ({ ...acc, [p.id]: p }), {}),
     'gameState': { 
-        pot: playersArr.length * 15, 
-        currentBet: 15, // La blinde fixe la première mise à 15
+        pot: playersArr.length * 10, 
+        currentBet: 10, // La blinde fixe la première mise à 10
         stage: 'PREFLOP', 
         activePlayerIndex: firstActor, 
         dealerIndex: dealerIdx,
@@ -249,7 +249,7 @@ btnStart.addEventListener('click', () => {
 function startHandLocally() {
   gameState.deck = createDeck();
   gameState.pot = 0;
-  gameState.currentBet = 15;
+  gameState.currentBet = 10;
   gameState.communityCards = [];
   gameState.stage = 'PREFLOP';
   gameState.activePlayerIndex = (gameState.dealerIndex + 1) % gameState.players.length;
@@ -257,11 +257,11 @@ function startHandLocally() {
   gameState.winnerId = null;
 
   gameState.players.forEach(p => {
-    p.chips -= 15;
-    gameState.pot += 15;
+    p.chips -= 10;
+    gameState.pot += 10;
     p.state = 'ACTIVE';
     p.lastAction = '';
-    p.currentBet = 15;
+    p.currentBet = 10;
     p.cards = [gameState.deck.pop(), gameState.deck.pop()];
   });
 
