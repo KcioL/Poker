@@ -638,31 +638,31 @@ function getBestHand(playerCards, communityCards) {
 
   const countsArr = Object.entries(valCounts).map(([val, count]) => ({val: parseInt(val), count})).sort((a,b) => b.count - a.count || b.val - a.val);
 
-  if (straightFlushHigh) {
-    if (straightFlushHigh === 14) return { name: "Quinte Flush Royale", score: 9000000 };
-    return { name: "Quinte Flush", score: 8000000 + straightFlushHigh };
+if (straightFlushHigh) {
+    if (straightFlushHigh === 14) return { name: "Quinte Flush Royale", score: 90000000 };
+    return { name: "Quinte Flush", score: 80000000 + straightFlushHigh };
   }
   if (countsArr[0].count === 4) {
-    return { name: "Carré", score: 7000000 + countsArr[0].val * 100 + countsArr[1].val };
+    return { name: "Carré", score: 70000000 + countsArr[0].val * 100 + countsArr[1].val };
   }
   if (countsArr[0].count === 3 && countsArr.length > 1 && countsArr[1].count >= 2) {
-    return { name: "Full", score: 6000000 + countsArr[0].val * 100 + countsArr[1].val };
+    return { name: "Full", score: 60000000 + countsArr[0].val * 100 + countsArr[1].val };
   }
   if (flushCards) {
     const score = flushCards.slice(0,5).reduce((acc, c, i) => acc + c.num * Math.pow(16, 4-i), 0);
-    return { name: "Couleur", score: 5000000 + score };
+    return { name: "Couleur", score: 50000000 + score };
   }
   if (straightHigh) {
-    return { name: "Quinte", score: 4000000 + straightHigh };
+    return { name: "Quinte", score: 40000000 + straightHigh };
   }
   if (countsArr[0].count === 3) {
-    return { name: "Brelan", score: 3000000 + countsArr[0].val * 10000 + countsArr[1].val * 100 + countsArr[2].val };
+    return { name: "Brelan", score: 30000000 + countsArr[0].val * 10000 + countsArr[1].val * 100 + countsArr[2].val };
   }
   if (countsArr[0].count === 2 && countsArr.length > 1 && countsArr[1].count === 2) {
-    return { name: "Double Paire", score: 2000000 + countsArr[0].val * 10000 + countsArr[1].val * 100 + countsArr[2].val };
+    return { name: "Double Paire", score: 20000000 + countsArr[0].val * 10000 + countsArr[1].val * 100 + countsArr[2].val };
   }
   if (countsArr[0].count === 2) {
-    return { name: "Paire", score: 1000000 + countsArr[0].val * 100000 + countsArr[1].val * 1000 + countsArr[2].val * 10 + countsArr[3].val };
+    return { name: "Paire", score: 10000000 + countsArr[0].val * 100000 + countsArr[1].val * 1000 + countsArr[2].val * 10 + countsArr[3].val };
   }
   
   const score = numCards.slice(0,5).reduce((acc, c, i) => acc + c.num * Math.pow(16, 4-i), 0);
