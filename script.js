@@ -305,8 +305,7 @@ function renderBoard() {
   
   if (me.cards) {
     me.cards.forEach(c => {
-      // Mes propres cartes sont toujours visibles
-      myCardsEl.appendChild(createCardElement(c, false));
+      myCardsEl.appendChild(createCardElement(c, false)); // Toujours visible pour moi
     });
   }
 
@@ -363,8 +362,12 @@ function checkTurnLogic() {
       actionButtons.classList.add('hidden');
       
       if (gameState.stage === 'END') {
-          const winner = gameState.players.find(p => p.id === gameState.winnerId);
-          if (winner) elGameMessage.textContent = `${winner.name} remporte la manche !`;
+          if (gameState.winnerId === 'SPLIT') {
+              elGameMessage.textContent = "Égalité ! Le pot est partagé.";
+          } else {
+              const winner = gameState.players.find(p => p.id === gameState.winnerId);
+              if (winner) elGameMessage.textContent = `${winner.name} remporte la manche !`;
+          }
           if (gameMode !== 'online' || isHost) btnStart.classList.remove('hidden');
       } else if (gameState.stage === 'SHOWDOWN') {
           elGameMessage.textContent = "Abattage des cartes !";
@@ -393,16 +396,51 @@ function checkTurnLogic() {
   }
 }
 
+// --- INTELLIGENCE ARTIFICIELLE DU BOT ---
 function botPlay() {
   const bot = gameState.players[gameState.activePlayerIndex];
   if (!bot || bot.state !== 'ACTIVE') return;
 
   let callAmount = (gameState.currentBet || 0) - (bot.currentBet || 0);
-  
-  if (Math.random() > 0.75 && bot.chips >= callAmount + 50) {
-    handleAction('RAISE', 50);
+  let handStrength = getBestHand(bot.cards, gameState.communityCards).score;
+  let pot = gameState.pot > 0 ? gameState.pot : 20;
+
+  // 15% de chance de bluffer
+  let isBluffing = Math.random() < 0.15;
+
+  // Logique offensive
+  if (handStrength >= 30000000 || (isBluffing && gameState.communityCards.length > 0)) {
+    // Brelan ou mieux (ou bluff) -> Relance dynamique (au moins la moitié du pot)
+    let raiseInt = Math.floor(pot / 2 / 10) * 10; 
+    if (raiseInt < 20) raiseInt = 20;
+
+    if (bot.chips >= callAmount + raiseInt) {
+      handleAction('RAISE', raiseInt);
+      return;
+    }
+  } else if (handStrength >= 10000000) {
+    // Paire ou Double Paire -> Call, ou petite relance
+    if (Math.random() < 0.25 && bot.chips >= callAmount + 20) {
+      handleAction('RAISE', 20);
+      return;
+    }
+  }
+
+  // Logique défensive
+  if (callAmount > 0) {
+    // Si on lui demande trop cher pour sa mauvaise main, il se couche
+    if (handStrength < 10000000 && !isBluffing && callAmount > 40) {
+      handleAction('FOLD');
+    } else {
+      handleAction('CHECK'); // Il suit
+    }
   } else {
-    handleAction('CHECK');
+    // Gratuit, il Check, sauf petit bluff 
+    if (isBluffing && bot.chips >= 20) {
+       handleAction('RAISE', 20); 
+    } else {
+       handleAction('CHECK');
+    }
   }
 }
 
@@ -490,7 +528,7 @@ function nextTurn() {
     elGameMessage.textContent = "Fin de la manche...";
     syncState(); 
     setTimeout(() => {
-      endRoundWinner(alivePlayers[0]);
+      endRoundWinner([alivePlayers[0]]); // Envoi dans un tableau pour uniformiser
     }, 2000);
     return;
   }
@@ -545,7 +583,7 @@ function fastForwardShowdown() {
 
 function triggerShowdownEval() {
   let bestScore = -1;
-  let winner = null;
+  let winners = [];
   
   gameState.players.forEach(p => {
       if (p.state !== 'FOLDED') {
@@ -554,7 +592,10 @@ function triggerShowdownEval() {
           
           if (handResult.score > bestScore) {
               bestScore = handResult.score;
-              winner = p;
+              winners = [p];
+          } else if (handResult.score === bestScore) {
+              // SPLIT POT : Si le score est identique
+              winners.push(p);
           }
       }
   });
@@ -562,7 +603,7 @@ function triggerShowdownEval() {
   syncState(); 
   
   setTimeout(() => {
-      endRoundWinner(winner);
+      endRoundWinner(winners);
   }, 4000); 
 }
 
@@ -599,7 +640,7 @@ function advanceStageActual(nextStage) {
   }
 }
 
-// --- ALGORITHME DE POKER ---
+// --- ALGORITHME DE POKER (Corrigé avec multiplicateurs X10) ---
 function getBestHand(playerCards, communityCards) {
   const allCards = [...playerCards, ...communityCards];
   if (allCards.length < 5) return { name: "Carte Haute", score: 0 };
@@ -638,7 +679,7 @@ function getBestHand(playerCards, communityCards) {
 
   const countsArr = Object.entries(valCounts).map(([val, count]) => ({val: parseInt(val), count})).sort((a,b) => b.count - a.count || b.val - a.val);
 
-if (straightFlushHigh) {
+  if (straightFlushHigh) {
     if (straightFlushHigh === 14) return { name: "Quinte Flush Royale", score: 90000000 };
     return { name: "Quinte Flush", score: 80000000 + straightFlushHigh };
   }
@@ -669,17 +710,25 @@ if (straightFlushHigh) {
   return { name: "Carte Haute", score: score };
 }
 
-function endRoundWinner(winner) {
-  const realWinner = gameState.players.find(p => p.id === winner.id);
-  
-  if (realWinner) {
-    gameState.stage = 'END';
-    gameState.winnerId = realWinner.id;
-    realWinner.chips += gameState.pot;
-    gameState.pot = 0;
-    
-    syncState();
+function endRoundWinner(winnersArray) {
+  gameState.stage = 'END';
+
+  if (winnersArray.length === 1) {
+      gameState.winnerId = winnersArray[0].id;
+      const realWinner = gameState.players.find(p => p.id === winnersArray[0].id);
+      if (realWinner) realWinner.chips += gameState.pot;
+  } else {
+      // Gestion de l'ÉGALITÉ
+      gameState.winnerId = 'SPLIT';
+      const splitAmount = Math.floor(gameState.pot / winnersArray.length);
+      winnersArray.forEach(w => {
+          const realW = gameState.players.find(p => p.id === w.id);
+          if (realW) realW.chips += splitAmount;
+      });
   }
+  
+  gameState.pot = 0;
+  syncState();
 }
 
 function syncState() {
